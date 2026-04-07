@@ -1,0 +1,28 @@
+{
+  "name": "crypto-lab-padding-oracle",
+  "version": "1.0.0",
+  "description": "Browser-based interactive demonstration of the CBC padding oracle attack",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "deploy": "vite build && gh-pages -d dist"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/systemslibrarian/crypto-lab-padding-oracle.git"
+  },
+  "keywords": ["cryptography", "aes-cbc", "padding-oracle", "security", "education"],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/systemslibrarian/crypto-lab-padding-oracle/issues"
+  },
+  "homepage": "https://systemslibrarian.github.io/crypto-lab-padding-oracle/",
+  "devDependencies": {
+    "gh-pages": "^6.3.0",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.7"
+  }
+}
