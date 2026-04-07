@@ -51,9 +51,8 @@ export function initThemeToggle(): void {
   const btn = document.getElementById('theme-toggle') as HTMLButtonElement | null;
   if (!btn) return;
 
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   const stored = localStorage.getItem('theme');
-  const isDark = stored ? stored === 'dark' : prefersDark;
+  const isDark = stored ? stored === 'dark' : true;
   applyTheme(isDark, btn);
 
   btn.addEventListener('click', () => {
