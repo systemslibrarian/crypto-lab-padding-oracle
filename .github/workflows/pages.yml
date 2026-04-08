@@ -25,9 +25,17 @@ jobs:
           node-version: 20
           cache: npm
 
-      - run: npm ci
+      - name: Install dependencies
+        run: npm install
 
-      - run: npm run build
+      - name: Type-check
+        run: npm run type-check
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
 
       - uses: actions/upload-pages-artifact@v3
         with:

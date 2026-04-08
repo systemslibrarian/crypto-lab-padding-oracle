@@ -51,22 +51,22 @@ export function initThemeToggle(): void {
   const btn = document.getElementById('theme-toggle') as HTMLButtonElement | null;
   if (!btn) return;
 
-  const stored = localStorage.getItem('theme');
-  const isDark = stored ? stored === 'dark' : true;
-  applyTheme(isDark, btn);
+  // Sync button state with the data-theme already applied by the anti-flash script
+  const current = document.documentElement.getAttribute('data-theme') ?? 'dark';
+  syncToggleButton(btn, current === 'dark');
 
   btn.addEventListener('click', () => {
     const nowDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    applyTheme(!nowDark, btn);
-    localStorage.setItem('theme', !nowDark ? 'dark' : 'light');
+    const next = nowDark ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+    syncToggleButton(btn, !nowDark);
   });
 }
 
-function applyTheme(dark: boolean, btn: HTMLButtonElement): void {
-  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+function syncToggleButton(btn: HTMLButtonElement, dark: boolean): void {
+  btn.textContent = dark ? '\u{1F319}' : '\u{2600}\u{FE0F}';
   btn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
-  btn.setAttribute('aria-pressed', dark ? 'true' : 'false');
-  btn.textContent = dark ? '☀ Light' : '☾ Dark';
 }
 
 // ─── Panel navigation ─────────────────────────────────────────────────────────

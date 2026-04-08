@@ -6,112 +6,47 @@
 
 ---
 
-## Overview
+## What It Is
 
-`crypto-lab-padding-oracle` is a browser-based, fully interactive demonstration of the **CBC padding oracle attack** — a chosen-ciphertext attack that decrypts any AES-CBC ciphertext without knowing the key, using only a padding validity oracle (one bit of information per query).
-
-This is a deep-dive companion to the padding oracle panel in [crypto-lab-aes-modes](https://systemslibrarian.github.io/crypto-lab-aes-modes/), providing a complete step-by-step walkthrough of the full Vaudenay 2002 attack:
-- Single byte recovery
-- Full block recovery
-- Full multi-block ciphertext decryption
-
-**All cryptographic operations use the browser's native WebCrypto API.** No pure-JS AES, no simulated oracle responses, no faked math. The oracle performs real AES-CBC decryption and real PKCS#7 padding validation on every query.
+`crypto-lab-padding-oracle` is a browser-based interactive demonstration of the **CBC padding oracle attack** (Vaudenay 2002) — a chosen-ciphertext attack that decrypts any AES-CBC ciphertext without knowing the key, using only a one-bit padding validity oracle. All cryptographic operations use the browser's native WebCrypto API: real AES-128-CBC encryption with PKCS#7 padding, real AES-256-GCM for the AEAD defense demo, and real padding validation on every oracle query. The security model is symmetric-key cryptography — the attack exploits the combination of CBC mode and observable padding validation errors, not a weakness in AES itself.
 
 ---
 
-## Attack Stages
+## When to Use It
 
-| Panel | Description |
-|-------|-------------|
-| **1 — CBC & Padding** | CBC decryption flow, PKCS#7 rules, valid vs invalid padding, the oracle concept, real-world oracle examples |
-| **2 — Single Byte** | Core attack: probe all 256 values for last byte, recover intermediate via oracle, XOR to plaintext |
-| **3 — Full Block** | Extend to all 16 bytes: padding fixup for each position, running query count, intermediate state visualization |
-| **4 — Full Decryption** | Multi-block attack with block-by-block progress, speed controls, total oracle query count |
-| **5 — Hall of Fame** | Vaudenay 2002, MS10-070, Lucky Thirteen, POODLE, BEAST — with citations and CVEs |
-| **6 — Defenses** | Encrypt-then-MAC, constant-time validation, AEAD (AES-GCM live demo with tamper rejection) |
-
-**Attack complexity:** O(256 × block\_size × block\_count) oracle queries worst case; ~128 × block\_size × block\_count expected (uniform distribution over 0x00–0xFF).
+- **Teaching the Vaudenay 2002 attack** — the demo walks through single-byte recovery, full-block recovery, and multi-block decryption with live oracle query counts, making the O(256 × 16 × n) complexity tangible.
+- **Auditing legacy CBC implementations** — understanding how a padding oracle arises (HTTP error codes, TLS alerts, timing differences) is essential before assessing whether a system is vulnerable.
+- **Comparing CBC with AEAD** — Panel 6 demonstrates AES-256-GCM tamper rejection side-by-side with CBC, showing why AEAD eliminates the attack class entirely.
+- **Security training and CTF preparation** — the interactive byte-grid visualizer and speed controls make the attack mechanics concrete for hands-on learners.
+- **Do not use this as a production encryption library** — the oracle and key live in the same browser context; there is no network oracle, no real confidentiality boundary, and no key management.
 
 ---
 
-## Primitives Used
+## Live Demo
 
-- **AES-128-CBC** — WebCrypto `AES-CBC`, 128-bit key, random IV per session
-- **PKCS#7 padding** — Real validation: last `n` bytes must all equal `n`, 1 ≤ n ≤ 16
-- **Chosen-ciphertext attack** — Attacker submits crafted (C'[n-1], C[n]) pairs to the oracle
-- **XOR byte manipulation** — I[j] = probe ⊕ padByte; P[j] = I[j] ⊕ C[n-1][j]
-- **AES-256-GCM** — WebCrypto `AES-GCM` for AEAD defense demonstration
+**[https://systemslibrarian.github.io/crypto-lab-padding-oracle/](https://systemslibrarian.github.io/crypto-lab-padding-oracle/)**
+
+The demo has six tabbed panels. Panels 2–4 let you encrypt arbitrary plaintext with a random AES-128-CBC key, then run the full padding oracle attack at adjustable speeds (slow/medium/fast) while watching byte-by-byte recovery on an interactive grid. Panel 6 lets you encrypt with AES-256-GCM, tamper with the ciphertext, and see authentication fail with no plaintext revealed.
 
 ---
 
-## Running Locally
+## What Can Go Wrong
 
-```bash
-git clone https://github.com/systemslibrarian/crypto-lab-padding-oracle.git
-cd crypto-lab-padding-oracle
-npm install
-npm run dev
-```
-
-Open [http://localhost:5173/crypto-lab-padding-oracle/](http://localhost:5173/crypto-lab-padding-oracle/)
-
-### Build
-
-```bash
-npm run build
-```
-
-Output goes to `dist/`. All asset paths are relative; the build is GitHub Pages ready.
-
-### Deploy to GitHub Pages
-
-```bash
-npm run deploy
-```
-
-Requires `gh-pages` (included as dev dependency) and a configured `origin` remote.
+- **Distinguishable error responses** — returning HTTP 500 for padding errors versus HTTP 200 for other failures gives an attacker a direct one-bit oracle; this is exactly what broke ASP.NET (MS10-070 / CVE-2010-3332).
+- **Timing side-channels in padding validation** — even constant-time padding checks can leak information through MAC computation length differences, as demonstrated by Lucky Thirteen against TLS CBC cipher suites.
+- **Ignored padding bytes in SSL 3.0** — SSL 3.0 only validates the last padding byte, allowing POODLE to recover one plaintext byte per ~256 requests without a traditional padding oracle.
+- **Predictable IVs in TLS 1.0** — reusing the last ciphertext block as the next record's IV (BEAST) enables a related chosen-plaintext attack against CBC, even without a padding oracle.
+- **Using CBC without Encrypt-then-MAC** — MAC-then-encrypt or encrypt-only CBC is fundamentally vulnerable; the only complete fix is authenticated encryption (AES-GCM or ChaCha20-Poly1305).
 
 ---
 
-## Security Notes
+## Real-World Usage
 
-This demo implements a **local oracle** — the oracle function and the AES key live in the same browser context, so no network is involved. In real-world attacks, the oracle is remote:
-
-- **Error-response oracle:** HTTP 500 vs 200, TLS alert codes, distinct error messages
-- **Timing oracle:** Lucky Thirteen — measurable latency difference in MAC computation
-- **Protocol oracle:** POODLE — SSL 3.0 padding structure exploited over MITM
-
-**The fix is always the same: use AEAD.** AES-GCM checks the authentication tag before any decryption. No oracle is possible because no information is revealed on failure.
-
-This demo is for educational purposes. Understanding the attack is essential for anyone auditing legacy systems that still use CBC mode.
-
----
-
-## Accessibility
-
-This demo implements **WCAG 2.1 AA** compliance throughout:
-
-- All interactive elements have descriptive `aria-label` or `aria-labelledby` attributes
-- Full keyboard navigation — logical tab order, no keyboard traps, arrow key panel switching
-- Focus indicators visible in both dark and light modes (minimum 3:1 contrast ratio on focus ring)
-- Byte state indicators (unknown / probing / found / recovered) use both color and text labels — never color alone
-- Attack step animations respect `prefers-reduced-motion`
-- All status updates announced via `aria-live` regions
-- Color contrast: minimum 4.5:1 for normal text, 3:1 for large text, in both modes
-- Minimum tap target size: 44×44px (WCAG 2.5.5)
-- Screen reader navigable throughout
-
----
-
-## Why This Matters
-
-The padding oracle attack has broken production systems serving billions of users:
-
-- **ASP.NET (2010):** Microsoft patched a padding oracle that let attackers decrypt ViewState and session cookies — exploited in the wild within hours of disclosure (MS10-070).
-- **TLS (2013):** Lucky Thirteen showed that even constant-time padding validation leaks timing information sufficient to mount the attack.
-- **SSL 3.0 (2014):** POODLE forced a permanent deprecation of SSL 3.0 across all major browsers and servers.
-
-One bit of information — valid or invalid padding — answered up to 256 × 16 × n times — decrypts everything. The lesson is not just historical: CBC is still found in legacy payment systems, medical record software, enterprise VPNs, and embedded devices. Knowing this attack is essential for security audits of any system using CBC mode.
+- **TLS 1.0–1.2** — CBC cipher suites were standard in TLS for over a decade; TLS 1.3 (RFC 8446) removed them entirely because of the padding oracle attack class.
+- **ASP.NET ViewState** — Microsoft's web framework used AES-CBC to protect ViewState and session cookies, leading to full plaintext recovery via MS10-070 before the patch.
+- **IPsec ESP** — the Encapsulating Security Payload protocol supports AES-CBC mode for VPN tunnels; implementations must use Encrypt-then-MAC to avoid padding oracles.
+- **OpenSSL / GnuTLS / NSS** — all three major TLS libraries required patches for Lucky Thirteen timing side-channels in their CBC padding validation paths.
+- **PKCS#7 / CMS (S/MIME)** — the Cryptographic Message Syntax uses CBC with PKCS#7 padding for email encryption; Efail (2018) demonstrated related plaintext exfiltration against S/MIME implementations.
 
 ---
 

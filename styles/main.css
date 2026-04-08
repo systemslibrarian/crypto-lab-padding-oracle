@@ -190,6 +190,7 @@ a:hover { text-decoration: none; }
   max-width: 1200px;
   margin: 0 auto;
   padding: var(--space-3) var(--space-4);
+  position: relative;
 }
 .site-header__top {
   display: flex;
@@ -262,17 +263,19 @@ a:hover { text-decoration: none; }
 
 /* Theme toggle */
 .theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 50%;
   background: var(--color-surface);
   color: var(--color-text);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-2) var(--space-3);
-  font-size: 0.875rem;
-  font-weight: 600;
+  font-size: 1.25rem;
   cursor: pointer;
-  min-width: var(--tap-min);
-  min-height: var(--tap-min);
-  white-space: nowrap;
+  padding: 0;
+  line-height: 1;
   transition: background 0.15s, border-color 0.15s;
 }
 .theme-toggle:hover {

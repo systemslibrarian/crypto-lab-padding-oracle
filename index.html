@@ -6,6 +6,12 @@
   <meta name="description" content="Interactive browser-based demonstration of the CBC padding oracle attack — decrypt any AES-CBC ciphertext without the key using only a padding validity oracle." />
   <meta name="theme-color" content="#0f1117" />
   <title>Padding Oracle — crypto-lab</title>
+  <script>
+    (function () {
+      const saved = localStorage.getItem('theme');
+      document.documentElement.setAttribute('data-theme', saved ?? 'dark');
+    })();
+  </script>
   <link rel="stylesheet" href="/styles/main.css" />
 </head>
 <body>
@@ -43,8 +49,8 @@
                 class="theme-toggle"
                 type="button"
                 aria-label="Switch to light mode"
-                aria-pressed="true">
-          ☀ Light
+                style="position: absolute; top: 0; right: 0;">
+          🌙
         </button>
       </div>
 
