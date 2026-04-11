@@ -182,9 +182,6 @@ a:hover { text-decoration: none; }
 .site-header {
   background: var(--color-bg-2);
   border-bottom: 1px solid var(--color-border);
-  position: sticky;
-  top: 0;
-  z-index: 100;
 }
 .site-header__inner {
   max-width: 1200px;
@@ -309,6 +306,15 @@ a:hover { text-decoration: none; }
   border-color: var(--color-primary);
 }
 
+/* ─── Sticky tab bar ────────────────────────────────────────────── */
+.tabs-sticky-bar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--color-bg-2);
+  border-bottom: 1px solid var(--color-border);
+}
+
 /* ─── Panel tabs ─────────────────────────────────────────────────── */
 .panel-tabs-wrapper {
   max-width: 1200px;
@@ -370,14 +376,13 @@ a:hover { text-decoration: none; }
 .site-main {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 var(--space-4) var(--space-12);
+  padding: var(--space-4) var(--space-4) var(--space-12);
 }
 
 .panel {
   background: var(--color-bg-3);
   border: 1px solid var(--color-primary);
-  border-top: none;
-  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  border-radius: var(--radius-lg);
   padding: var(--space-6);
 }
 
@@ -969,6 +974,37 @@ a:hover { text-decoration: none; }
   font-size: 0.8125rem;
   font-weight: 700;
   flex-shrink: 0;
+}
+
+/* ─── Attack commentary ─────────────────────────────────────────── */
+.attack-commentary {
+  display: none;
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  font-size: 0.875rem;
+  color: var(--color-text-2);
+  margin-bottom: var(--space-4);
+  line-height: 1.7;
+}
+.attack-commentary--active { display: block; }
+.attack-commentary__label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-primary);
+  margin-bottom: var(--space-2);
+}
+.attack-commentary code {
+  font-size: 0.875em;
+  background: var(--color-code-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.1em 0.35em;
+  font-family: var(--font-mono);
 }
 
 /* ─── Result container ───────────────────────────────────────────── */

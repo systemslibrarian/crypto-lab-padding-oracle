@@ -233,6 +233,14 @@ export function initPanel2(): void {
   const cipherDisplay = document.getElementById('p2-cipher-display');
   const byteGridEl = document.getElementById('p2-byte-grid');
   const resultEl = document.getElementById('p2-result');
+  const commentaryEl = document.getElementById('p2-commentary');
+  const commentaryTextEl = document.getElementById('p2-commentary-text');
+
+  function setP2Commentary(html: string): void {
+    if (!commentaryEl || !commentaryTextEl) return;
+    commentaryEl.classList.add('attack-commentary--active');
+    commentaryTextEl.innerHTML = html;
+  }
 
   if (!encryptBtn || !runBtn) return;
 
@@ -256,6 +264,13 @@ export function initPanel2(): void {
       }
 
       if (statusEl) statusEl.textContent = 'Session ready. Click "Run Attack" to start.';
+      setP2Commentary(
+        `Encryption done. The attack targets the <strong>last block</strong> of the ciphertext. ` +
+        `It will probe all 256 possible values for the last byte of the previous ciphertext block (C[n−1][15]), ` +
+        `submitting each modified pair to the padding oracle. When the oracle says <em>valid 0x01 padding</em>, ` +
+        `we can compute the intermediate byte I[15] = probe ⊕ 0x01, and then recover ` +
+        `plaintext P[15] = I[15] ⊕ C[n−1][15] — <strong>no key needed</strong>.`
+      );
       announce('Encryption complete. Session ready.');
       runBtn.disabled = false;
     } catch (err) {
@@ -288,6 +303,11 @@ export function initPanel2(): void {
 
     let lastEvent: AttackEvent | null = null;
 
+    setP2Commentary(
+      `Attack started on block ${targetIdx + 1}. Probing byte position 15 (rightmost) first — ` +
+      `trying all 256 values of C[n−1][15] until the oracle returns valid <code>0x01</code> padding.`
+    );
+
     try {
       const { plaintext } = await recoverBlock(
         p2Session,
@@ -303,8 +323,25 @@ export function initPanel2(): void {
           if (event.kind === 'byte-found' && statusEl) {
             const inter = event.intermediateValue ?? 0;
             const pt = event.recoveredByte ?? 0;
+            const char = pt >= 32 && pt < 127 ? String.fromCharCode(pt) : '·';
+            const bytePos = BLOCK_SIZE - 1 - event.byteIndex;
             statusEl.textContent =
               `Byte ${BLOCK_SIZE - event.byteIndex}: I=0x${inter.toString(16).padStart(2,'0')} → P=0x${pt.toString(16).padStart(2,'0')} (${pt >= 32 && pt < 127 ? String.fromCharCode(pt) : '·'})`;
+            const cprev = prevBlock[event.byteIndex];
+            const padByte = BLOCK_SIZE - event.byteIndex;
+            setP2Commentary(
+              `<strong>Byte ${BLOCK_SIZE - event.byteIndex} of 16 recovered!</strong> ` +
+              `Probe <code>0x${(event.probeValue ?? 0).toString(16).padStart(2,'0')}</code> produced valid ` +
+              `<code>0x${padByte.toString(16).padStart(2,'0')}</code> padding. ` +
+              `Intermediate: I[${event.byteIndex}] = <code>0x${(event.probeValue ?? 0).toString(16).padStart(2,'0')}</code> ⊕ ` +
+              `<code>0x${padByte.toString(16).padStart(2,'0')}</code> = <code>0x${inter.toString(16).padStart(2,'0')}</code>. ` +
+              `Plaintext: P[${event.byteIndex}] = I[${event.byteIndex}] ⊕ C[n−1][${event.byteIndex}] = ` +
+              `<code>0x${inter.toString(16).padStart(2,'0')}</code> ⊕ <code>0x${cprev.toString(16).padStart(2,'0')}</code> = ` +
+              `<code>0x${pt.toString(16).padStart(2,'0')}</code> ` +
+              (bytePos > 0
+                ? `("<strong>${escapeHtml(char)}</strong>"). Now setting up padding <code>0x${(padByte + 1).toString(16).padStart(2,'0')}</code> to recover byte ${bytePos}.`
+                : `("<strong>${escapeHtml(char)}</strong>"). All bytes recovered!`)
+            );
           }
 
           if (delay > 0 && (event.kind === 'byte-found' || event.probeValue === 0 || (event.probeValue ?? 0) % 16 === 0)) {
@@ -332,6 +369,12 @@ export function initPanel2(): void {
       }
 
       if (statusEl) statusEl.textContent = 'Attack complete!';
+      setP2Commentary(
+        `<strong>Attack complete!</strong> The last block was fully decrypted in ` +
+        `<strong>${(lastEvent as AttackEvent | null)?.queryCount ?? 0}</strong> oracle queries. ` +
+        `Each byte cost at most 256 queries to find (on average ~128). ` +
+        `The AES key was never needed — only the oracle's valid/invalid response.`
+      );
     } catch (err) {
       if (p2Aborted) {
         if (statusEl) statusEl.textContent = 'Attack stopped.';
@@ -367,6 +410,14 @@ export function initPanel3(): void {
   const intermediateGridEl = document.getElementById('p3-intermediate-grid');
   const xorDisplayEl = document.getElementById('p3-xor-display');
   const resultEl = document.getElementById('p3-result');
+  const commentaryEl = document.getElementById('p3-commentary');
+  const commentaryTextEl = document.getElementById('p3-commentary-text');
+
+  function setP3Commentary(html: string): void {
+    if (!commentaryEl || !commentaryTextEl) return;
+    commentaryEl.classList.add('attack-commentary--active');
+    commentaryTextEl.innerHTML = html;
+  }
 
   if (!encryptBtn || !runBtn) return;
 
@@ -379,6 +430,12 @@ export function initPanel3(): void {
       p3Session = await createOracleSession(toBytes(FIXED_PLAINTEXT));
 
       if (statusEl) statusEl.textContent = `Plaintext: "${FIXED_PLAINTEXT}" encrypted. Click "Run Full Block" to start.`;
+      setP3Commentary(
+        `The plaintext "<strong>${escapeHtml(FIXED_PLAINTEXT)}</strong>" is now AES-CBC encrypted. ` +
+        `The attack will recover all 16 bytes of this block, one at a time from right to left. ` +
+        `For each byte position j, the oracle is queried with craft prefix bytes that force ` +
+        `the desired PKCS#7 padding byte — revealing the intermediate value I[j] = AES⁻¹(C[n])[j].`
+      );
       announce('Encryption complete. Ready to attack.');
       runBtn.disabled = false;
       if (resultEl) resultEl.innerHTML = '';
@@ -442,6 +499,23 @@ export function initPanel3(): void {
                 'Plaintext P[j..]'
               );
             }
+
+            const inter = event.intermediateValue ?? 0;
+            const pt = event.recoveredByte ?? 0;
+            const char = pt >= 32 && pt < 127 ? String.fromCharCode(pt) : '·';
+            const recovered = BLOCK_SIZE - event.byteIndex;
+            const padByte = BLOCK_SIZE - event.byteIndex;
+            setP3Commentary(
+              `<strong>Byte ${recovered}/16 recovered.</strong> ` +
+              `Probe <code>0x${(event.probeValue ?? 0).toString(16).padStart(2,'0')}</code> gave valid ` +
+              `<code>0x${padByte.toString(16).padStart(2,'0')}</code> padding at position ${event.byteIndex}. ` +
+              `Intermediate I[${event.byteIndex}] = <code>0x${inter.toString(16).padStart(2,'0')}</code>. ` +
+              `Plaintext P[${event.byteIndex}] = <code>0x${pt.toString(16).padStart(2,'0')}</code> ` +
+              `("<strong>${escapeHtml(char)}</strong>"). ` +
+              (event.byteIndex > 0
+                ? `Next: fix up known bytes for <code>0x${(padByte + 1).toString(16).padStart(2,'0')}</code> padding, then probe position ${event.byteIndex - 1}.`
+                : `All 16 bytes recovered — XOR with C[n−1] confirms the full plaintext!`)
+            );
           }
 
           if (queryCountEl) queryCountEl.textContent = String(event.queryCount);
@@ -479,6 +553,12 @@ export function initPanel3(): void {
       }
       announce(`Full block recovered: "${fromBytes(strippedPlain)}"`);
       if (statusEl) statusEl.textContent = 'Full block recovered!';
+      setP3Commentary(
+        `<strong>Full block decrypted!</strong> "${escapeHtml(fromBytes(strippedPlain))}" — ` +
+        `recovered in <strong>${p3Session.queryCount}</strong> oracle queries. ` +
+        `The XOR table above shows how each intermediate byte I[j] XORed with C[n−1][j] ` +
+        `yields the plaintext. The AES key was never used or needed.`
+      );
     } catch {
       if (statusEl) statusEl.textContent = 'Attack stopped.';
     } finally {
@@ -508,6 +588,14 @@ export function initPanel4(): void {
   const blockVizEl = document.getElementById('p4-block-viz');
   const resultEl = document.getElementById('p4-result');
   const progressBar = document.getElementById('p4-progress') as HTMLProgressElement;
+  const commentaryEl = document.getElementById('p4-commentary');
+  const commentaryTextEl = document.getElementById('p4-commentary-text');
+
+  function setP4Commentary(html: string): void {
+    if (!commentaryEl || !commentaryTextEl) return;
+    commentaryEl.classList.add('attack-commentary--active');
+    commentaryTextEl.innerHTML = html;
+  }
 
   if (!generateBtn || !runBtn) return;
 
@@ -526,6 +614,12 @@ export function initPanel4(): void {
         const info = theoreticalQueryCount(p4Session.ciphertext.length);
         statusEl.textContent = `${cblocks.length} block(s) encrypted. Worst-case queries: ${info.worstCase.toLocaleString()}. Click "Run Full Attack".`;
       }
+      setP4Commentary(
+        `<strong>${cblocks.length} ciphertext block${cblocks.length > 1 ? 's' : ''} ready.</strong> ` +
+        `The attack will process each block in turn, recovering 16 plaintext bytes per block. ` +
+        `Each byte requires up to 256 oracle queries (expected ~128). ` +
+        `The IV is used to recover the first block — just as in a real-world attack where the IV travels with the ciphertext.`
+      );
       announce('Ciphertext generated. Ready to attack.');
       runBtn.disabled = false;
       if (resultEl) resultEl.innerHTML = '';

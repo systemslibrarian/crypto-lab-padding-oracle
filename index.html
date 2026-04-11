@@ -27,24 +27,6 @@
     <div class="site-header__inner">
       <div class="site-header__top">
         <span class="category-chip" aria-label="Category: Cryptanalysis">Cryptanalysis</span>
-        <nav class="site-header__links" aria-label="Related demos">
-          <a href="https://systemslibrarian.github.io/crypto-lab-aes-modes/"
-             class="cross-link-badge"
-             target="_blank" rel="noopener noreferrer"
-             aria-label="Related demo: AES Modes Lab (opens in new tab)">AES Modes</a>
-          <a href="https://systemslibrarian.github.io/crypto-lab-timing-oracle/"
-             class="cross-link-badge"
-             target="_blank" rel="noopener noreferrer"
-             aria-label="Related demo: Timing Oracle Lab (opens in new tab)">Timing Oracle</a>
-          <a href="https://systemslibrarian.github.io/crypto-lab-shadow-vault/"
-             class="cross-link-badge"
-             target="_blank" rel="noopener noreferrer"
-             aria-label="Related demo: Shadow Vault Lab (opens in new tab)">Shadow Vault</a>
-          <a href="https://systemslibrarian.github.io/crypto-compare/"
-             class="cross-link-badge cross-link-badge--primary"
-             target="_blank" rel="noopener noreferrer"
-             aria-label="Symmetric cipher comparison (opens in new tab)">crypto-compare</a>
-        </nav>
         <button id="theme-toggle"
                 class="theme-toggle"
                 type="button"
@@ -76,10 +58,8 @@
     </div>
   </header>
 
-  <!-- ═══════════════════════════════════════════════════════ MAIN -->
-  <main id="main-content" class="site-main">
-
-    <!-- Panel navigation tabs -->
+  <!-- ─── Panel navigation (sticky) ────────────────────────────── -->
+  <div class="tabs-sticky-bar">
     <div class="panel-tabs-wrapper" role="tablist" aria-label="Demo panels">
       <button class="panel-tab" role="tab" aria-selected="true" tabindex="0"
               aria-controls="panel-1" id="tab-1">
@@ -112,6 +92,10 @@
         <span class="panel-tab__label">Defenses</span>
       </button>
     </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ MAIN -->
+  <main id="main-content" class="site-main">
 
     <!-- ─────────────────────────────────────────────── PANEL 1 -->
     <section class="panel" id="panel-1" role="tabpanel" aria-labelledby="tab-1">
@@ -198,14 +182,6 @@
                class="result-container"></div>
         </section>
 
-        <p class="cross-link-note" role="note">
-          ← Back to basics?
-          <a href="https://systemslibrarian.github.io/crypto-lab-aes-modes/"
-             target="_blank" rel="noopener noreferrer"
-             aria-label="Visit AES Modes Lab for CBC fundamentals (opens in new tab)">
-            crypto-lab-aes-modes CBC panel
-          </a>
-        </p>
       </div>
     </section>
 
@@ -287,6 +263,11 @@
 
         <div id="p2-status" role="status" aria-live="polite" class="status-display">
           Click "Encrypt" to begin.
+        </div>
+
+        <div id="p2-commentary" class="attack-commentary" role="note" aria-label="Step-by-step attack explanation">
+          <div class="attack-commentary__label">What's happening</div>
+          <div id="p2-commentary-text"></div>
         </div>
 
         <div class="hex-displays" role="group" aria-label="Ciphertext and IV display">
@@ -384,6 +365,11 @@
           Click "Encrypt Target Block" to start.
         </div>
 
+        <div id="p3-commentary" class="attack-commentary" role="note" aria-label="Step-by-step attack explanation">
+          <div class="attack-commentary__label">What's happening</div>
+          <div id="p3-commentary-text"></div>
+        </div>
+
         <div class="two-grids" role="group" aria-label="Plaintext and intermediate byte grids">
           <section class="panel-section" aria-labelledby="p3-plain-grid-heading">
             <h3 id="p3-plain-grid-heading" class="section-title">Plaintext Bytes (P[n])</h3>
@@ -472,6 +458,11 @@
           Enter plaintext and click "Generate Ciphertext".
         </div>
 
+        <div id="p4-commentary" class="attack-commentary" role="note" aria-label="Step-by-step attack explanation">
+          <div class="attack-commentary__label">What's happening</div>
+          <div id="p4-commentary-text"></div>
+        </div>
+
         <div class="query-display" role="status" aria-live="polite" aria-label="Oracle query count">
           Oracle queries: <strong id="p4-query-count">0</strong>
         </div>
@@ -527,13 +518,6 @@
               this attack: CBC with any padding oracle — whether explicit error responses or
               timing side-channels — is fundamentally broken. AEAD ciphers authenticate before
               decrypting, so no padding oracle can exist.
-            </p>
-            <p>
-              <a href="https://systemslibrarian.github.io/crypto-lab-aes-modes/"
-                 target="_blank" rel="noopener noreferrer"
-                 aria-label="See AES-GCM in AES Modes Lab (opens in new tab)">
-                See AES-GCM in action → crypto-lab-aes-modes
-              </a>
             </p>
           </div>
         </section>
@@ -691,22 +675,6 @@
           </div>
         </section>
 
-        <div class="cross-links" role="navigation" aria-label="Related labs">
-          <a href="https://systemslibrarian.github.io/crypto-lab-shadow-vault/"
-             class="cross-link-card"
-             target="_blank" rel="noopener noreferrer"
-             aria-label="Shadow Vault: ChaCha20-Poly1305 in depth (opens in new tab)">
-            crypto-lab-shadow-vault →<br>
-            <span>ChaCha20-Poly1305 in depth</span>
-          </a>
-          <a href="https://systemslibrarian.github.io/crypto-lab-timing-oracle/"
-             class="cross-link-card"
-             target="_blank" rel="noopener noreferrer"
-             aria-label="Timing Oracle Lab: side-channel timing attacks (opens in new tab)">
-            crypto-lab-timing-oracle →<br>
-            <span>Timing oracle companion</span>
-          </a>
-        </div>
       </div>
     </section>
 
@@ -724,12 +692,6 @@
             <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
           </svg>
           <span>GitHub</span>
-        </a>
-        <a href="https://systemslibrarian.github.io/crypto-compare/"
-           class="cross-link-badge"
-           target="_blank" rel="noopener noreferrer"
-           aria-label="crypto-compare symmetric cipher tool (opens in new tab)">
-          crypto-compare
         </a>
       </div>
       <p class="site-footer__verse">
