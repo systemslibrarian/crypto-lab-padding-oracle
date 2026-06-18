@@ -13,7 +13,7 @@
  */
 
 import { BLOCK_SIZE } from './oracle.ts';
-import { AttackEvent } from './attack.ts';
+import type { AttackEvent } from './attack.ts';
 
 export type ByteState = 'unknown' | 'probing' | 'found' | 'complete';
 
@@ -24,25 +24,28 @@ export interface ByteCellData {
   label: string;               // text label for screen readers
 }
 
+// Single shared reduced-motion tracker — one listener for the whole module
+// (each BlockGrid used to add its own listener that was never removed).
+let prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+window.matchMedia('(prefers-reduced-motion: reduce)')
+  .addEventListener('change', (e) => { prefersReducedMotion = e.matches; });
+
 /** A rendered block grid (one row of 16 cells) */
 export class BlockGrid {
   private cells: ByteCellData[] = [];
   private container: HTMLElement;
   private queryCountEl: HTMLElement | null = null;
-  private reducedMotion: boolean;
+  // Persistent cell elements so updates touch only the changed cell instead of
+  // rebuilding all 16 cells' innerHTML on every one of ~thousands of probes.
+  private cellEls: HTMLElement[] = [];
+  private valueEls: HTMLElement[] = [];
+  private stateEls: HTMLElement[] = [];
 
   constructor(container: HTMLElement, queryCountEl?: HTMLElement) {
     this.container = container;
     this.queryCountEl = queryCountEl ?? null;
-    this.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    // Re-check if media query changes
-    window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', (e) => {
-      this.reducedMotion = e.matches;
-    });
-
     this.initCells();
-    this.render();
+    this.buildDom();
   }
 
   private initCells(): void {
@@ -54,89 +57,34 @@ export class BlockGrid {
     }));
   }
 
-  reset(): void {
-    this.initCells();
-    this.render();
-  }
-
-  /**
-   * Update a cell based on an attack event.
-   */
-  applyEvent(event: AttackEvent): void {
-    const idx = event.byteIndex;
-    if (idx < 0 || idx >= BLOCK_SIZE) return;
-
-    switch (event.kind) {
-      case 'byte-probe':
-        this.cells[idx] = {
-          state: 'probing',
-          value: event.probeValue ?? null,
-          intermediateValue: null,
-          label: `Byte ${idx + 1}: probing — trying 0x${(event.probeValue ?? 0).toString(16).padStart(2, '0')}`,
-        };
-        break;
-
-      case 'byte-found':
-        this.cells[idx] = {
-          state: 'found',
-          value: event.recoveredByte ?? null,
-          intermediateValue: event.intermediateValue ?? null,
-          label: `Byte ${idx + 1}: intermediate 0x${(event.intermediateValue ?? 0).toString(16).padStart(2, '0')} found`,
-        };
-        break;
-
-      case 'block-complete':
-        // Mark all cells complete if we have the block
-        if (event.recoveredBlock) {
-          for (let i = 0; i < BLOCK_SIZE; i++) {
-            this.cells[i] = {
-              state: 'complete',
-              value: event.recoveredBlock[i],
-              intermediateValue: this.cells[i].intermediateValue,
-              label: `Byte ${i + 1}: plaintext 0x${event.recoveredBlock[i].toString(16).padStart(2, '0')}`,
-            };
-          }
-        }
-        break;
-
-      case 'attack-complete':
-        break;
-    }
-
-    this.render();
-
-    if (this.queryCountEl) {
-      this.queryCountEl.textContent = event.queryCount.toString();
-    }
-  }
-
-  private render(): void {
+  /** Build the cell DOM once; subsequent updates mutate cells in place. */
+  private buildDom(): void {
     this.container.innerHTML = '';
-    this.container.setAttribute('role', 'grid');
-    this.container.setAttribute('aria-label', 'Block byte state grid');
+    this.container.removeAttribute('role');
 
     const row = document.createElement('div');
-    row.setAttribute('role', 'row');
     row.className = 'byte-grid-row';
+    // Read-only set of bytes — a list conveys "16 items" without implying the
+    // arrow-key-navigable interaction that role="grid" promises.
+    row.setAttribute('role', 'list');
+    row.setAttribute('aria-label', 'Block bytes, position 1 to 16');
+
+    this.cellEls = [];
+    this.valueEls = [];
+    this.stateEls = [];
 
     this.cells.forEach((cell, i) => {
       const cellEl = document.createElement('div');
-      cellEl.setAttribute('role', 'gridcell');
+      cellEl.setAttribute('role', 'listitem');
       cellEl.className = `byte-cell byte-cell--${cell.state}`;
       cellEl.setAttribute('aria-label', cell.label);
       cellEl.setAttribute('data-state', cell.state);
       cellEl.setAttribute('data-index', String(i));
 
-      if (!this.reducedMotion && cell.state === 'probing') {
-        cellEl.classList.add('byte-cell--animate');
-      }
-
       const valueEl = document.createElement('span');
       valueEl.className = 'byte-cell__value';
       valueEl.setAttribute('aria-hidden', 'true');
-      valueEl.textContent = cell.value !== null
-        ? cell.value.toString(16).padStart(2, '0')
-        : '??';
+      valueEl.textContent = '??';
 
       const stateLabel = document.createElement('span');
       stateLabel.className = 'byte-cell__state-label sr-only';
@@ -145,9 +93,87 @@ export class BlockGrid {
       cellEl.appendChild(valueEl);
       cellEl.appendChild(stateLabel);
       row.appendChild(cellEl);
+
+      this.cellEls[i] = cellEl;
+      this.valueEls[i] = valueEl;
+      this.stateEls[i] = stateLabel;
     });
 
     this.container.appendChild(row);
+  }
+
+  /** Sync a single cell's DOM to its current data. */
+  private updateCell(i: number): void {
+    const cell = this.cells[i];
+    const cellEl = this.cellEls[i];
+    if (!cellEl) return;
+    cellEl.className = `byte-cell byte-cell--${cell.state}`;
+    if (!prefersReducedMotion && cell.state === 'probing') {
+      cellEl.classList.add('byte-cell--animate');
+    }
+    cellEl.setAttribute('aria-label', cell.label);
+    cellEl.setAttribute('data-state', cell.state);
+    this.valueEls[i].textContent = cell.value !== null
+      ? cell.value.toString(16).padStart(2, '0')
+      : '??';
+    this.stateEls[i].textContent = stateText(cell.state);
+  }
+
+  reset(): void {
+    this.initCells();
+    for (let i = 0; i < BLOCK_SIZE; i++) this.updateCell(i);
+  }
+
+  /**
+   * Update a cell based on an attack event. Touches only the affected cell(s).
+   */
+  applyEvent(event: AttackEvent): void {
+    const idx = event.byteIndex;
+
+    switch (event.kind) {
+      case 'byte-probe':
+        if (idx < 0 || idx >= BLOCK_SIZE) break;
+        this.cells[idx] = {
+          state: 'probing',
+          value: event.probeValue ?? null,
+          intermediateValue: null,
+          label: `Byte ${idx + 1}: probing — trying 0x${(event.probeValue ?? 0).toString(16).padStart(2, '0')}`,
+        };
+        this.updateCell(idx);
+        break;
+
+      case 'byte-found':
+        if (idx < 0 || idx >= BLOCK_SIZE) break;
+        this.cells[idx] = {
+          state: 'found',
+          value: event.recoveredByte ?? null,
+          intermediateValue: event.intermediateValue ?? null,
+          label: `Byte ${idx + 1}: intermediate 0x${(event.intermediateValue ?? 0).toString(16).padStart(2, '0')} found`,
+        };
+        this.updateCell(idx);
+        break;
+
+      case 'block-complete':
+        if (event.recoveredBlock) {
+          for (let i = 0; i < BLOCK_SIZE; i++) {
+            this.cells[i] = {
+              state: 'complete',
+              value: event.recoveredBlock[i],
+              intermediateValue: this.cells[i].intermediateValue,
+              label: `Byte ${i + 1}: plaintext 0x${event.recoveredBlock[i].toString(16).padStart(2, '0')}`,
+            };
+            this.updateCell(i);
+          }
+        }
+        break;
+
+      case 'attack-complete':
+        break;
+    }
+
+    if (this.queryCountEl) {
+      this.queryCountEl.textContent = event.queryCount.toString();
+    }
   }
 }
 
@@ -256,7 +282,7 @@ function createBlockEl(
  */
 export function buildCBCDiagram(container: HTMLElement): void {
   container.innerHTML = `
-    <div class="cbc-diagram" role="img" aria-label="CBC decryption block diagram">
+    <div class="cbc-diagram" role="img" aria-label="CBC decryption flow: ciphertext block C[i] passes through AES inverse cipher to produce an intermediate value, which is XORed with the previous ciphertext block C[i minus 1] to yield plaintext block P[i]. The plaintext's final bytes are then checked for valid PKCS#7 padding — that check is the oracle.">
       <div class="cbc-diagram__row">
         <div class="cbc-block cbc-block--cipher" aria-label="Ciphertext block C[i-1]">
           <span class="cbc-block__label" aria-hidden="true">C[i−1]</span>

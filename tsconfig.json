@@ -15,5 +15,7 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "vite.config.ts"]
+  "include": ["src", "vite.config.ts"],
+  "comment": "Tests run via `node --test` (TS type-stripping at runtime); they are excluded here to keep the browser build free of Node typings.",
+  "exclude": ["src/**/*.test.ts"]
 }

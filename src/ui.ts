@@ -11,7 +11,6 @@
 import {
   createOracleSession,
   queryOracle,
-  OracleSession,
   splitBlocks,
   xorBytes,
   toHex,
@@ -20,12 +19,13 @@ import {
   stripPKCS7,
   BLOCK_SIZE,
 } from './oracle.ts';
+import type { OracleSession } from './oracle.ts';
 import {
   fullCiphertextAttack,
   recoverBlock,
   theoreticalQueryCount,
-  AttackEvent,
 } from './attack.ts';
+import type { AttackEvent } from './attack.ts';
 import {
   BlockGrid,
   buildCBCDiagram,
@@ -65,8 +65,11 @@ export function initThemeToggle(): void {
 }
 
 function syncToggleButton(btn: HTMLButtonElement, dark: boolean): void {
-  btn.textContent = dark ? '\u{1F319}' : '\u{2600}\u{FE0F}';
-  btn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+  const icon = btn.querySelector<HTMLElement>('.theme-toggle__icon') ?? btn;
+  icon.textContent = dark ? '\u{1F319}' : '\u{2600}\u{FE0F}';
+  // Stable name ("Dark mode") + aria-pressed carries the on/off state, so screen
+  // readers announce a clear "Dark mode, toggle button, pressed/not pressed".
+  btn.setAttribute('aria-pressed', dark ? 'true' : 'false');
 }
 
 // ─── Panel navigation ─────────────────────────────────────────────────────────
@@ -85,6 +88,8 @@ export function initPanelNav(): void {
       panel.hidden = i !== index;
       if (i === index) panel.setAttribute('tabindex', '-1');
     });
+    // Keep the active tab fully visible in the horizontally-scrolling bar (mobile).
+    tabs[index]?.scrollIntoView({ block: 'nearest', inline: 'center' });
     announce(`Panel ${index + 1}: ${tabs[index]?.textContent?.trim() ?? ''}`);
   }
 
@@ -218,7 +223,6 @@ export function initPanel1(): void {
 // ─── Panel 2: Single Byte Recovery ───────────────────────────────────────────
 
 let p2Session: OracleSession | null = null;
-let p2Aborted = false;
 let p2Controller: AbortController | null = null;
 
 export function initPanel2(): void {
@@ -287,9 +291,12 @@ export function initPanel2(): void {
     if (blocks.length < 1) return;
 
     p2Controller = new AbortController();
-    p2Aborted = false;
     runBtn.disabled = true;
     stopBtn.disabled = false;
+    // Reset per-run state so a second run reports its own query count, not a
+    // cumulative total, and doesn't show the previous run's result block.
+    p2Session.queryCount = 0;
+    if (resultEl) resultEl.innerHTML = '';
 
     // Attack the last block (index blocks.length-1), prev = blocks[length-2] or IV
     const targetIdx = blocks.length - 1;
@@ -352,20 +359,35 @@ export function initPanel2(): void {
       );
 
       if (resultEl) {
+        // When the input length is an exact multiple of 16, PKCS#7 appends a
+        // whole extra block of 0x10 bytes — which becomes the *last* block this
+        // panel attacks. The recovery is correct, but stripping padding leaves
+        // an empty string, so explain rather than show a blank "success".
+        const isFullPaddingBlock =
+          plaintext.length === BLOCK_SIZE && plaintext.every(b => b === BLOCK_SIZE);
         const strippedPlain = stripPKCS7(plaintext) ?? plaintext;
-        const hex = toHex(strippedPlain);
+        const hex = toHex(isFullPaddingBlock ? plaintext : strippedPlain);
         const text = fromBytes(strippedPlain);
+        const paddingNote = isFullPaddingBlock
+          ? `<div class="result-row"><span class="result-label">Note:</span>
+              <span class="text-display">This last block is a full PKCS#7 padding block (16 × 0x10),
+              appended because the message length is a multiple of 16. The attack recovered it correctly —
+              the message bytes live in the earlier blocks (try Panel 4 for full multi-block recovery).</span></div>`
+          : '';
         resultEl.innerHTML = `
           <div class="result-block" role="region" aria-label="Attack result">
-            <div class="result-row"><span class="result-label">Recovered plaintext (hex):</span>
+            <div class="result-row"><span class="result-label">Recovered ${isFullPaddingBlock ? 'block' : 'plaintext'} (hex):</span>
               <span class="hex-display" aria-label="Hex: ${escapeHtml(hex)}">${escapeHtml(hex)}</span></div>
             <div class="result-row"><span class="result-label">Recovered plaintext (text):</span>
-              <span class="text-display" aria-label="Text: ${escapeHtml(text)}">${escapeHtml(text)}</span></div>
+              <span class="text-display" aria-label="Text: ${escapeHtml(text)}">${escapeHtml(text) || '<em>(empty — this block was pure padding)</em>'}</span></div>
+            ${paddingNote}
             <div class="result-row"><span class="result-label">Total oracle queries:</span>
               <span class="query-count">${(lastEvent as AttackEvent | null)?.queryCount ?? 0}</span></div>
           </div>
         `;
-        announce(`Attack complete. Recovered: ${text}`);
+        announce(isFullPaddingBlock
+          ? 'Attack complete. The last block was a full padding block and was recovered correctly.'
+          : `Attack complete. Recovered: ${text}`);
       }
 
       if (statusEl) statusEl.textContent = 'Attack complete!';
@@ -376,7 +398,7 @@ export function initPanel2(): void {
         `The AES key was never needed — only the oracle's valid/invalid response.`
       );
     } catch (err) {
-      if (p2Aborted) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
         if (statusEl) statusEl.textContent = 'Attack stopped.';
         announce('Attack stopped.');
       } else {
@@ -389,7 +411,6 @@ export function initPanel2(): void {
   });
 
   stopBtn?.addEventListener('click', () => {
-    p2Aborted = true;
     p2Controller?.abort();
   });
 }

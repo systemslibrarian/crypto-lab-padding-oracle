@@ -24,15 +24,15 @@
 
 import {
   BLOCK_SIZE,
-  OracleSession,
   queryOracle,
   splitBlocks,
   xorBytes,
   stripPKCS7,
 } from './oracle.ts';
+import type { OracleSession } from './oracle.ts';
 
 /** Callback invoked after each oracle query (for UI updates) */
-export type ProgressCallback = (event: AttackEvent) => void;
+export type ProgressCallback = (event: AttackEvent) => void | Promise<void>;
 
 export type AttackEventKind =
   | 'byte-probe'        // single byte probe attempt
@@ -104,7 +104,8 @@ export async function recoverByte(
 
     modified[bytePos] = guess;
 
-    onProgress?.({
+    // Awaited so the UI's animation delay actually paces the attack loop.
+    await onProgress?.({
       kind: 'byte-probe',
       blockIndex,
       byteIndex: bytePos,
@@ -135,7 +136,7 @@ export async function recoverByte(
       // Plaintext byte: P[bytePos] = I[bytePos] XOR original prevBlock[bytePos]
       const plaintextByte = intermediateVal ^ prevBlock[bytePos];
 
-      onProgress?.({
+      await onProgress?.({
         kind: 'byte-found',
         blockIndex,
         byteIndex: bytePos,
@@ -197,7 +198,7 @@ export async function recoverBlock(
   // Recover plaintext: P = intermediate XOR prevBlock
   const plaintext = xorBytes(intermediate, prevBlock);
 
-  onProgress?.({
+  await onProgress?.({
     kind: 'block-complete',
     blockIndex,
     byteIndex: 0,
@@ -263,7 +264,7 @@ export async function fullCiphertextAttack(
 
   const stripped = stripPKCS7(combined) ?? combined;
 
-  onProgress?.({
+  await onProgress?.({
     kind: 'attack-complete',
     blockIndex: totalBlocks - 1,
     byteIndex: 0,

@@ -2,9 +2,11 @@
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="description" content="Interactive browser-based demonstration of the CBC padding oracle attack — decrypt any AES-CBC ciphertext without the key using only a padding validity oracle." />
-  <meta name="theme-color" content="#0f1117" />
+  <meta name="color-scheme" content="dark light" />
+  <meta name="theme-color" content="#0f1117" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#f0f4ff" media="(prefers-color-scheme: light)" />
   <title>Padding Oracle — crypto-lab</title>
   <script>
     (function () {
@@ -30,9 +32,10 @@
         <button id="theme-toggle"
                 class="theme-toggle"
                 type="button"
-                aria-label="Switch to light mode"
-                style="position: absolute; top: 0; right: 0;">
-          🌙
+                aria-label="Dark mode"
+                aria-pressed="true"
+                title="Toggle dark / light mode">
+          <span class="theme-toggle__icon" aria-hidden="true">🌙</span>
         </button>
       </div>
 
@@ -305,14 +308,13 @@
             </span>
           </div>
           <div id="p2-byte-grid" class="byte-grid" aria-label="Block byte recovery grid"></div>
-          <div class="query-display" role="status" aria-live="polite" aria-label="Oracle query count">
+          <div class="query-display">
             Oracle queries: <strong id="p2-query-count">0</strong>
           </div>
         </section>
 
         <div id="p2-result"
              role="region"
-             aria-live="polite"
              aria-label="Attack result"
              class="result-container"></div>
       </div>
@@ -382,7 +384,7 @@
           </section>
         </div>
 
-        <div class="query-display" role="status" aria-live="polite" aria-label="Oracle query count">
+        <div class="query-display">
           Oracle queries: <strong id="p3-query-count">0</strong>
         </div>
 
@@ -391,13 +393,11 @@
           <div id="p3-xor-display"
                class="xor-display"
                role="region"
-               aria-live="polite"
                aria-label="XOR operation visualization"></div>
         </section>
 
         <div id="p3-result"
              role="region"
-             aria-live="polite"
              aria-label="Full block recovery result"
              class="result-container"></div>
       </div>
@@ -464,7 +464,7 @@
           <div id="p4-commentary-text"></div>
         </div>
 
-        <div class="query-display" role="status" aria-live="polite" aria-label="Oracle query count">
+        <div class="query-display">
           Oracle queries: <strong id="p4-query-count">0</strong>
         </div>
 
@@ -477,12 +477,10 @@
         <div id="p4-block-viz"
              class="block-viz"
              role="region"
-             aria-live="polite"
              aria-label="Ciphertext block visualization"></div>
 
         <div id="p4-result"
              role="region"
-             aria-live="polite"
              aria-label="Full decryption result"
              class="result-container"></div>
 
