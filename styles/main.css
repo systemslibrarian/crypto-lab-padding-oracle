@@ -1684,3 +1684,15 @@ a:hover { text-decoration: none; }
   }
   .attack-progress { forced-color-adjust: none; }
 }
+
+
+/* ═══ Accessibility: WCAG AA contrast overrides (auto-added) ═══ */
+[data-theme="dark"] .cross-link-badge--primary { background-color: #123359; } /* was #1a4a80 on #4a9eff = 3.27:1 → 4.64:1 */
+[data-theme="dark"] .cbc-xor { background-color: #123359; } /* was #1a4a80 on #4a9eff = 3.27:1 → 4.64:1 */
+[data-theme="dark"] .cross-link-card:hover { background-color: #123359; } /* was #1a4a80 on #4a9eff = 3.27:1 → 4.64:1 */
+[data-theme="light"] .btn--attack:hover:not(:disabled) { background-color: #fff9f9; } /* was #fef2f2 on #dc2626 = 4.41:1 → 4.64:1 */
+
+
+/* ═══ Accessibility: faint-text contrast overrides (auto-added) ═══ */
+[data-theme="light"] .section-title--valid,
+[data-theme="light"] .cbc-padding-check__result { color: #0f7234; } /* was #16a34a, now ≥4.6:1 on theme surfaces */
