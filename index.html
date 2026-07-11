@@ -439,11 +439,13 @@
           <div class="hex-display-row">
             <span class="hex-label">IV:</span>
             <div id="p2-iv-display" class="hex-display hex-display--scrollable"
+                 role="group" tabindex="0"
                  aria-label="Initialization vector (IV)"></div>
           </div>
           <div class="hex-display-row">
             <span class="hex-label">Ciphertext:</span>
             <div id="p2-cipher-display" class="hex-display hex-display--scrollable"
+                 role="group" tabindex="0"
                  aria-label="AES-CBC ciphertext"></div>
           </div>
         </div>
@@ -468,7 +470,7 @@
               <span>Recovered</span>
             </span>
           </div>
-          <div id="p2-byte-grid" class="byte-grid" aria-label="Block byte recovery grid"></div>
+          <div id="p2-byte-grid" class="byte-grid" role="group" tabindex="0" aria-label="Block byte recovery grid"></div>
           <div class="query-display">
             Oracle queries: <strong id="p2-query-count">0</strong>
           </div>
@@ -537,11 +539,11 @@
         <div class="two-grids" role="group" aria-label="Plaintext and intermediate byte grids">
           <section class="panel-section" aria-labelledby="p3-plain-grid-heading">
             <h3 id="p3-plain-grid-heading" class="section-title">Plaintext Bytes (P[n])</h3>
-            <div id="p3-byte-grid" class="byte-grid" aria-label="Recovered plaintext bytes"></div>
+            <div id="p3-byte-grid" class="byte-grid" role="group" tabindex="0" aria-label="Recovered plaintext bytes"></div>
           </section>
           <section class="panel-section" aria-labelledby="p3-inter-grid-heading">
             <h3 id="p3-inter-grid-heading" class="section-title">Intermediate (I = AES⁻¹(C[n]))</h3>
-            <div id="p3-intermediate-grid" class="byte-grid" aria-label="Intermediate decryption values"></div>
+            <div id="p3-intermediate-grid" class="byte-grid" role="group" tabindex="0" aria-label="Intermediate decryption values"></div>
           </section>
         </div>
 

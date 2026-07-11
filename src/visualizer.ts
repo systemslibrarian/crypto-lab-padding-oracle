@@ -60,7 +60,10 @@ export class BlockGrid {
   /** Build the cell DOM once; subsequent updates mutate cells in place. */
   private buildDom(): void {
     this.container.innerHTML = '';
-    this.container.removeAttribute('role');
+    // Keep the container a labeled, focusable scroll region (role="group" +
+    // tabindex from the markup); the inner row carries role="list". Leaving an
+    // aria-label on a roleless generic div is an aria-prohibited-attr failure.
+    this.container.setAttribute('role', 'group');
 
     const row = document.createElement('div');
     row.className = 'byte-grid-row';
@@ -284,7 +287,7 @@ export function buildCBCDiagram(container: HTMLElement): void {
   container.innerHTML = `
     <div class="cbc-diagram" role="img" aria-label="CBC decryption flow: ciphertext block C[i] passes through AES inverse cipher to produce an intermediate value, which is XORed with the previous ciphertext block C[i minus 1] to yield plaintext block P[i]. The plaintext's final bytes are then checked for valid PKCS#7 padding — that check is the oracle.">
       <div class="cbc-diagram__row">
-        <div class="cbc-block cbc-block--cipher" aria-label="Ciphertext block C[i-1]">
+        <div class="cbc-block cbc-block--cipher">
           <span class="cbc-block__label" aria-hidden="true">C[i−1]</span>
           <div class="cbc-block__bytes" aria-hidden="true">
             <span class="hex-byte">c0</span><span class="hex-byte">c1</span>
@@ -292,7 +295,7 @@ export function buildCBCDiagram(container: HTMLElement): void {
           </div>
         </div>
         <div class="cbc-arrow" aria-hidden="true">→</div>
-        <div class="cbc-block cbc-block--cipher" aria-label="Ciphertext block C[i]">
+        <div class="cbc-block cbc-block--cipher">
           <span class="cbc-block__label" aria-hidden="true">C[i]</span>
           <div class="cbc-block__bytes" aria-hidden="true">
             <span class="hex-byte">d0</span><span class="hex-byte">d1</span>
@@ -301,19 +304,19 @@ export function buildCBCDiagram(container: HTMLElement): void {
         </div>
       </div>
       <div class="cbc-diagram__row cbc-diagram__row--ops">
-        <div class="cbc-op" aria-label="Previous ciphertext block used as XOR input"></div>
+        <div class="cbc-op"></div>
         <div class="cbc-arrow cbc-arrow--down" aria-hidden="true">↓</div>
-        <div class="cbc-op cbc-block--aes" aria-label="AES block cipher decryption">
+        <div class="cbc-op cbc-block--aes">
           <span>AES⁻¹</span>
         </div>
       </div>
       <div class="cbc-diagram__row cbc-diagram__row--xor">
-        <div class="cbc-xor" aria-label="XOR operation combining decrypted block with previous ciphertext">
+        <div class="cbc-xor">
           <span aria-hidden="true">⊕</span>
         </div>
       </div>
       <div class="cbc-diagram__row">
-        <div class="cbc-block cbc-block--plain" aria-label="Plaintext block P[i] with PKCS#7 padding check">
+        <div class="cbc-block cbc-block--plain">
           <span class="cbc-block__label" aria-hidden="true">P[i] + padding</span>
           <div class="cbc-block__bytes" aria-hidden="true">
             <span class="hex-byte">p0</span><span class="hex-byte">p1</span>
@@ -323,7 +326,7 @@ export function buildCBCDiagram(container: HTMLElement): void {
             <span class="hex-byte hex-byte--pad">03</span>
           </div>
         </div>
-        <div class="cbc-padding-check" aria-label="Padding oracle returns valid or invalid">
+        <div class="cbc-padding-check">
           <span class="cbc-padding-check__label">Padding Oracle</span>
           <span class="cbc-padding-check__result" id="padding-check-result">Valid ✓</span>
         </div>

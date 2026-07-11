@@ -26,6 +26,7 @@
   --color-primary-dim:  #1a4a80;
   --color-chip-text:    #bcd9ff; /* readable on --color-primary-dim */
   --color-accent:       #7c5cbf;
+  --color-accent-text:  #a68ce0; /* readable accent for text on dark surfaces (base #7c5cbf = 3.39:1 on --color-bg-2) */
 
   --color-valid:        #22c55e;
   --color-valid-bg:     #052e16;
@@ -82,7 +83,7 @@
 
   --color-text:         #1a202c;
   --color-text-2:       #4a5568;
-  --color-text-3:       #5d6b82; /* ≥4.5:1 on light bg for body text */
+  --color-text-3:       #556278; /* ≥4.5:1 on light bg/bg-3 for body text (was #5d6b82 = 4.26:1 on --color-bg-3) */
 
   --color-primary:      #1a56db;
   --color-primary-strong: #1a56db; /* already ≥6:1 with white in light mode */
@@ -107,6 +108,8 @@
 
   --color-warning:      #d97706;
   --color-warning-bg:   #fffbeb;
+
+  --color-accent-text:  #654bab; /* readable accent for text on light surfaces (base #7c5cbf = 4.32:1 on --color-bg-2) */
 
   --color-code-bg:      #f1f5f9;
 }
@@ -219,7 +222,7 @@ a:hover { text-decoration: none; }
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--color-accent);
+  color: var(--color-accent-text);
   border: 1px solid var(--color-accent);
   border-radius: 99px;
   padding: 2px 10px;
@@ -454,7 +457,10 @@ a:hover { text-decoration: none; }
   border-bottom: 1px solid var(--color-border);
 }
 .section-title--valid { color: var(--color-valid); }
-.section-title--invalid { color: var(--color-invalid); }
+/* Lifted per-theme text token keeps ≥4.5:1 on panel surfaces; the bright
+   --color-invalid hue is reserved for borders/dots. Was --color-invalid
+   (#ef4444 = 4.06:1 dark / #dc2626 = 3.81:1 light on --color-bg-3). */
+.section-title--invalid { color: var(--color-invalid-text); }
 
 /* ─── Buttons ────────────────────────────────────────────────────── */
 .btn {

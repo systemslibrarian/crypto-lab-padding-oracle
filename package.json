@@ -9,13 +9,20 @@
     "test": "node --test",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "test:a11y": "playwright test",
     "deploy": "vite build && gh-pages -d dist"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/systemslibrarian/crypto-lab-padding-oracle.git"
   },
-  "keywords": ["cryptography", "aes-cbc", "padding-oracle", "security", "education"],
+  "keywords": [
+    "cryptography",
+    "aes-cbc",
+    "padding-oracle",
+    "security",
+    "education"
+  ],
   "author": "",
   "license": "ISC",
   "bugs": {
@@ -23,6 +30,8 @@
   },
   "homepage": "https://systemslibrarian.github.io/crypto-lab-padding-oracle/",
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
+    "@playwright/test": "^1.61.1",
     "gh-pages": "^6.3.0",
     "typescript": "^6.0.2",
     "vite": "^8.0.7"
