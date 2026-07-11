@@ -8,6 +8,51 @@
   <meta name="theme-color" content="#0f1117" media="(prefers-color-scheme: dark)" />
   <meta name="theme-color" content="#f0f4ff" media="(prefers-color-scheme: light)" />
   <title>Padding Oracle — crypto-lab</title>
+
+  <link rel="canonical" href="https://systemslibrarian.github.io/crypto-lab-padding-oracle/" />
+
+  <!-- Favicon (SVG, with a data-URI fallback so browsers that predate SVG icons still render one) -->
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230f1117'/%3E%3Crect x='8' y='14' width='16' height='12' rx='2.4' fill='%234a9eff'/%3E%3Cpath d='M10 15v-4a6 6 0 0 1 11.4-2.6' fill='none' stroke='%238b99b5' stroke-width='2.4'/%3E%3C/svg%3E" />
+  <link rel="apple-touch-icon" href="/favicon.svg" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Crypto Lab" />
+  <meta property="og:title" content="CBC Padding Oracle Attack — Interactive Demo" />
+  <meta property="og:description" content="Decrypt any AES-CBC ciphertext without the key using only a one-bit padding validity oracle. Real WebCrypto, live byte-by-byte recovery, and an AES-GCM defense panel." />
+  <meta property="og:url" content="https://systemslibrarian.github.io/crypto-lab-padding-oracle/" />
+  <meta property="og:image" content="https://systemslibrarian.github.io/crypto-lab-padding-oracle/og-card.svg" />
+  <meta property="og:image:type" content="image/svg+xml" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Crypto Lab — Padding Oracle Attack. A padlock beside VALID/INVALID oracle chips: one bit is enough." />
+
+  <!-- Twitter / X -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="CBC Padding Oracle Attack — Interactive Demo" />
+  <meta name="twitter:description" content="Decrypt any AES-CBC ciphertext without the key using only a one-bit padding validity oracle. Real WebCrypto, live recovery, AES-GCM defense." />
+  <meta name="twitter:image" content="https://systemslibrarian.github.io/crypto-lab-padding-oracle/og-card.svg" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "LearningResource",
+    "name": "CBC Padding Oracle Attack — Interactive Demo",
+    "description": "Browser-based interactive demonstration of the CBC padding oracle attack (Vaudenay 2002): decrypt any AES-CBC ciphertext without the key using only a one-bit padding validity oracle.",
+    "url": "https://systemslibrarian.github.io/crypto-lab-padding-oracle/",
+    "learningResourceType": "interactive simulation",
+    "educationalLevel": "advanced",
+    "isAccessibleForFree": true,
+    "keywords": ["cryptography", "AES-CBC", "padding oracle", "Vaudenay 2002", "AEAD", "security education"],
+    "inLanguage": "en",
+    "isPartOf": {
+      "@type": "Collection",
+      "name": "Crypto Lab",
+      "url": "https://crypto-lab.systemslibrarian.dev/"
+    }
+  }
+  </script>
   <script>
     (function () {
       const saved = localStorage.getItem('theme');

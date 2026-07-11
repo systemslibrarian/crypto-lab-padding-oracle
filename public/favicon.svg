@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Padding oracle padlock">
+  <defs>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4a9eff"/>
+      <stop offset="1" stop-color="#7c5cbf"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="7" fill="#0f1117"/>
+  <!-- shackle, drawn ajar to hint the lock is broken by the oracle -->
+  <path d="M10 15 v-4 a6 6 0 0 1 11.4 -2.6"
+        fill="none" stroke="#8b99b5" stroke-width="2.4" stroke-linecap="round"/>
+  <!-- lock body -->
+  <rect x="8" y="14" width="16" height="12" rx="2.4" fill="url(#body)"/>
+  <!-- keyhole -->
+  <circle cx="16" cy="19" r="2" fill="#0f1117"/>
+  <rect x="15.1" y="19.5" width="1.8" height="4" rx="0.9" fill="#0f1117"/>
+</svg>
