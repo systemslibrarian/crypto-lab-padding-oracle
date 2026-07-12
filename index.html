@@ -186,41 +186,16 @@
   <div id="aria-announcer" role="status" aria-live="polite" aria-atomic="true" class="sr-only"></div>
 
   <!-- ═══════════════════════════════════════════════════════ HEADER -->
-  <header class="site-header" role="banner">
-    <div class="site-header__inner">
-      <div class="site-header__top">
-        <span class="category-chip" aria-label="Category: Cryptanalysis">Cryptanalysis</span>
-        <button id="theme-toggle"
-                class="theme-toggle"
-                type="button"
-                aria-label="Dark mode"
-                aria-pressed="true"
-                title="Toggle dark / light mode">
-          <span class="theme-toggle__icon" aria-hidden="true">🌙</span>
-        </button>
-      </div>
-
-      <div class="site-header__title-block">
-        <h1 class="site-title">
-          <span class="site-title__main">Padding Oracle</span>
-          <span class="site-title__sub">CBC Chosen-Ciphertext Attack — Full Walkthrough</span>
-        </h1>
-        <div class="primitive-chips" aria-label="Cryptographic primitives used">
-          <span class="primitive-chips__label">Topics covered:</span>
-          <span class="chip">AES-CBC</span>
-          <span class="chip">PKCS#7</span>
-          <span class="chip">Chosen-Ciphertext</span>
-          <span class="chip">Vaudenay 2002</span>
-        </div>
-      </div>
-
-      <div class="why-matters" role="note" aria-label="Why this matters">
-        <strong>Why this matters:</strong>
-        The padding oracle attack has broken ASP.NET, TLS, and dozens of other systems.
-        One bit of information — valid or invalid padding — is enough to decrypt
-        any CBC ciphertext without the key.
-      </div>
+  <header class="cl-hero">
+    <div class="cl-hero-main">
+      <h1 class="cl-hero-title">Padding Oracle</h1>
+      <p class="cl-hero-sub">AES-CBC · PKCS#7 · Vaudenay 2002</p>
+      <p class="cl-hero-desc">Recover an AES-CBC plaintext byte by byte from a single valid/invalid padding oracle — no key required — then watch AES-GCM shut the whole attack down.</p>
     </div>
+    <aside class="cl-hero-why" aria-label="Why it matters">
+      <span class="cl-hero-why-label">WHY IT MATTERS</span>
+      <p class="cl-hero-why-text">The same one-bit leak has broken TLS, ASP.NET, IPsec, and JavaServer Faces in the wild. It shows why unauthenticated CBC is exploitable in practice, and why authenticated encryption (AEAD) is now the non-negotiable default.</p>
+    </aside>
   </header>
 
   <!-- ─── Panel navigation (sticky) ────────────────────────────── -->
