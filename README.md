@@ -52,9 +52,9 @@ npm run dev
 
 ## Citations
 
-- **Vaudenay, S. (2002).** Security Flaws Induced by CBC Padding. *EUROCRYPT 2002.* [PDF](https://www.iacr.org/cryptodb/archive/2002/EUROCRYPT/2850/2850.pdf)
+- **Vaudenay, S. (2002).** Security Flaws Induced by CBC Padding — Applications to SSL, IPSEC, WTLS. *EUROCRYPT 2002, LNCS 2332, pp. 534-545.* [PDF](https://www.iacr.org/archive/eurocrypt2002/23320530/cbc02_e02d.pdf)
 - **Al Fardan, N.J. & Paterson, K.G. (2013).** Lucky Thirteen: Breaking the TLS and DTLS Record Protocols. *IEEE S&P 2013.* [PDF](https://www.isg.rhul.ac.uk/tls/TLStiming.pdf)
-- **Möller, B., Duong, T., & Kotowicz, K. (2014).** This POODLE Bites: Exploiting the SSL 3.0 Fallback. *Google Security Research.* [PDF](https://www.openssl.org/~bodo/ssl-poodle.pdf)
+- **Möller, B., Duong, T., & Kotowicz, K. (2014).** This POODLE Bites: Exploiting the SSL 3.0 Fallback. *Google Security Research.* [PDF](https://openssl-library.org/files/ssl-poodle.pdf)
 - **Duong, T. & Rizzo, J. (2011).** Here Come The ⊕ Ninjas. *Ekoparty 2011.*
 - **Microsoft (2010).** MS10-070: Vulnerability in ASP.NET Could Allow Information Disclosure.
 

@@ -712,12 +712,24 @@ export function initPanel4(): void {
       );
 
       const recoveredText = fromBytes(result.plaintext);
+
+      // Byte-for-byte check of the recovered plaintext against the plaintext the
+      // session actually encrypted. The attacker path never reads this — it is
+      // the demo grading itself, so the "recovered" claim on screen is a result
+      // and not an assertion the page could make even if the attack were broken.
+      const original = p4Session.plaintext;
+      const exact =
+        result.plaintext.length === original.length &&
+        result.plaintext.every((b, i) => b === original[i]);
+
       if (resultEl) {
         const info = theoreticalQueryCount(p4Session.ciphertext.length);
         resultEl.innerHTML = `
           <div class="result-block" role="region" aria-label="Full decryption result">
             <div class="result-row"><span class="result-label">Recovered plaintext:</span>
               <blockquote class="recovered-text" aria-label="Recovered plaintext: ${escapeHtml(recoveredText)}">${escapeHtml(recoveredText)}</blockquote></div>
+            <div class="result-row"><span class="result-label">Checked against the encrypted plaintext:</span>
+              <span class="badge badge--${exact ? 'valid' : 'invalid'}">${exact ? 'byte-for-byte match' : 'MISMATCH — the attack did not fully recover it'}</span></div>
             <div class="result-row"><span class="result-label">Total oracle queries:</span>
               <span class="query-count">${result.queryCount.toLocaleString()}</span></div>
             <div class="result-row"><span class="result-label">Theoretical O(256×16×${totalBlocks}) worst case:</span>
@@ -727,7 +739,10 @@ export function initPanel4(): void {
           </div>
         `;
       }
-      announce(`Full decryption complete. Recovered: ${recoveredText}`);
+      announce(
+        `Full decryption complete. Recovered: ${recoveredText}. ` +
+        (exact ? 'Byte-for-byte match with the original plaintext.' : 'It does NOT match the original plaintext.')
+      );
     } catch {
       if (statusEl) statusEl.textContent = 'Attack stopped.';
     } finally {
@@ -896,8 +911,9 @@ export async function initP1OracleDemo(): Promise<void> {
             </span>
           </div>
           <p class="info-note" role="note">
-            The oracle reveals one bit. That bit, queried ${BLOCK_SIZE * 256} times per block,
-            is enough to decrypt everything — without knowing the key.
+            The oracle reveals one bit. That bit, queried at most ${BLOCK_SIZE * 256} times per
+            block — about ${BLOCK_SIZE * 128} on average, since a 256-value scan finds the right
+            probe halfway through — is enough to decrypt everything, without knowing the key.
           </p>
         </div>
       `;
