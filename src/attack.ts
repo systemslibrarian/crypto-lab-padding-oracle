@@ -24,12 +24,14 @@
 
 import {
   BLOCK_SIZE,
+  applyPKCS7,
+  createOracleSession,
   queryOracle,
   splitBlocks,
   xorBytes,
   stripPKCS7,
 } from './oracle.ts';
-import type { OracleSession } from './oracle.ts';
+import type { OracleMode, OracleSession } from './oracle.ts';
 
 /** Callback invoked after each oracle query (for UI updates) */
 export type ProgressCallback = (event: AttackEvent) => void | Promise<void>;
@@ -277,6 +279,87 @@ export async function fullCiphertextAttack(
     queryCount: session.queryCount,
     intermediates: allIntermediates,
   };
+}
+
+/** Outcome of running the attack against one server configuration. */
+export interface DefenseTrial {
+  mode: OracleMode;
+  /** The recovered first block, or null when the attack could not finish. */
+  recovered: Uint8Array | null;
+  /** True only when the recovered block equals the block that was encrypted. */
+  matchedPlaintext: boolean;
+  /** Bytes the attack actually managed to pull out before it stalled. */
+  bytesRecovered: number;
+  queryCount: number;
+  /** Queries that reached the PKCS#7 check. */
+  paddingChecks: number;
+  /** Queries the MAC dropped before decryption. */
+  macRejections: number;
+  /** Why the attack stopped, or null when it succeeded. */
+  failure: string | null;
+}
+
+/**
+ * Run the identical attack against a server in the given mode.
+ *
+ * This calls the same recoverBlock() the vulnerable panels use — the only thing
+ * that changes is how the server answers. Failure is a real failure: when the
+ * oracle stops leaking, recoverByte exhausts all 256 probes and throws, and that
+ * is what gets reported.
+ */
+export async function trialAgainstMode(
+  plaintext: Uint8Array,
+  mode: OracleMode,
+  onProgress?: ProgressCallback,
+  signal?: AbortSignal
+): Promise<DefenseTrial> {
+  const session = await createOracleSession(plaintext, mode);
+  const blocks = splitBlocks(session.ciphertext);
+  let bytesRecovered = 0;
+
+  const track: ProgressCallback = async (event) => {
+    if (event.kind === 'byte-found') bytesRecovered++;
+    await onProgress?.(event);
+  };
+
+  try {
+    const { plaintext: recovered } = await recoverBlock(
+      session,
+      session.iv,
+      blocks[0],
+      0,
+      blocks.length,
+      track,
+      signal
+    );
+
+    // Grade against what was actually encrypted, block 0 of the padded input.
+    const expected = applyPKCS7(session.plaintext).slice(0, BLOCK_SIZE);
+    const matched =
+      recovered.length === expected.length && recovered.every((b, i) => b === expected[i]);
+
+    return {
+      mode,
+      recovered,
+      matchedPlaintext: matched,
+      bytesRecovered,
+      queryCount: session.queryCount,
+      paddingChecks: session.paddingChecks,
+      macRejections: session.macRejections,
+      failure: null,
+    };
+  } catch (err) {
+    return {
+      mode,
+      recovered: null,
+      matchedPlaintext: false,
+      bytesRecovered,
+      queryCount: session.queryCount,
+      paddingChecks: session.paddingChecks,
+      macRejections: session.macRejections,
+      failure: err instanceof Error ? err.message : String(err),
+    };
+  }
 }
 
 /**

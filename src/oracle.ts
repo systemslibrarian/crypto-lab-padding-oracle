@@ -22,6 +22,23 @@ function toAB(u8: Uint8Array): Uint8Array<ArrayBuffer> {
   return new Uint8Array(u8) as Uint8Array<ArrayBuffer>;
 }
 
+/**
+ * How the server under attack answers a query.
+ *
+ * - `leaky`  — the vulnerable case: padding validity is observable (HTTP 500 vs
+ *              200, a TLS alert, a timing difference). One bit per query.
+ * - `silent` — the server still decrypts and still checks padding, but collapses
+ *              every failure into one uniform error, so the attacker's
+ *              observation never changes.
+ * - `etm`    — Encrypt-then-MAC: a MAC over the submitted ciphertext is verified
+ *              first, and anything the attacker modified is rejected before AES
+ *              decryption is attempted at all.
+ *
+ * The mode lives on the session rather than in the attack, so the *same* attack
+ * code in attack.ts runs unmodified against all three.
+ */
+export type OracleMode = 'leaky' | 'silent' | 'etm';
+
 /** AES-CBC key wrapper for reuse across oracle calls */
 export interface OracleSession {
   key: CryptoKey;
@@ -29,19 +46,51 @@ export interface OracleSession {
   ciphertext: Uint8Array;  // full ciphertext WITHOUT the IV
   plaintext: Uint8Array;   // original plaintext (for verification only)
   queryCount: number;
+  mode: OracleMode;
+  /** HMAC-SHA256 key used by the Encrypt-then-MAC server. Never given out. */
+  macKey: CryptoKey;
+  /**
+   * Hex tags of the legitimate (C[n-1] || C[n]) pairs this session issued. An
+   * Encrypt-then-MAC server accepts a submission only when the MAC it computes
+   * over what it received is one it actually produced.
+   */
+  legitTags: Set<string>;
+  /** Queries that reached the PKCS#7 check (i.e. AES-CBC decryption ran). */
+  paddingChecks: number;
+  /** Queries dropped by MAC verification before any decryption. */
+  macRejections: number;
 }
 
 /** Result of a single oracle query */
 export interface OracleResult {
   valid: boolean;
   queryCount: number;
+  /** False when the server rejected before the padding was ever examined. */
+  reachedPaddingCheck: boolean;
+}
+
+function concatBlocks(a: Uint8Array, b: Uint8Array): Uint8Array {
+  const out = new Uint8Array(a.length + b.length);
+  out.set(a, 0);
+  out.set(b, a.length);
+  return out;
+}
+
+async function macHex(key: CryptoKey, data: Uint8Array): Promise<string> {
+  const signature = await crypto.subtle.sign('HMAC', key, toAB(data));
+  return Array.from(new Uint8Array(signature))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 /**
  * Generate a new AES-128-CBC key and encrypt the given plaintext.
  * Returns a session object for use with the oracle.
  */
-export async function createOracleSession(plaintext: Uint8Array): Promise<OracleSession> {
+export async function createOracleSession(
+  plaintext: Uint8Array,
+  mode: OracleMode = 'leaky'
+): Promise<OracleSession> {
   const key = await crypto.subtle.generateKey(
     { name: 'AES-CBC', length: 128 },
     false,  // not extractable — key never leaves WebCrypto
@@ -57,12 +106,35 @@ export async function createOracleSession(plaintext: Uint8Array): Promise<Oracle
     toAB(plaintext)
   );
 
+  const ciphertext = new Uint8Array(encrypted);
+
+  // The Encrypt-then-MAC server's key, plus a tag over every legitimate
+  // (prev, target) pair. Real HMAC-SHA256, computed here and recomputed on
+  // every query — nothing about the rejection is stubbed.
+  const macKey = await crypto.subtle.generateKey(
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+
+  const blocks = splitBlocks(ciphertext);
+  const legitTags = new Set<string>();
+  for (let i = 0; i < blocks.length; i++) {
+    const prev = i === 0 ? iv : blocks[i - 1];
+    legitTags.add(await macHex(macKey, concatBlocks(prev, blocks[i])));
+  }
+
   return {
     key,
     iv: iv.slice(),
-    ciphertext: new Uint8Array(encrypted),
+    ciphertext,
     plaintext: plaintext.slice(),
     queryCount: 0,
+    mode,
+    macKey,
+    legitTags,
+    paddingChecks: 0,
+    macRejections: 0,
   };
 }
 
@@ -86,10 +158,25 @@ export async function queryOracle(
 ): Promise<OracleResult> {
   session.queryCount++;
 
+  // Encrypt-then-MAC: verify the tag over the submitted ciphertext FIRST. A
+  // real deployment must compare tags in constant time; the Set lookup here is
+  // about correctness, not timing.
+  if (session.mode === 'etm') {
+    const tag = await macHex(session.macKey, concatBlocks(prevBlock, targetBlock));
+    if (!session.legitTags.has(tag)) {
+      session.macRejections++;
+      // No decryption happens. There is no padding to have an opinion about.
+      return { valid: false, queryCount: session.queryCount, reachedPaddingCheck: false };
+    }
+  }
+
+  session.paddingChecks++;
+
   // Use prevBlock as the IV (first block is XORed with IV in CBC decryption)
   // WebCrypto AES-CBC decryption: P[i] = D_K(C[i]) XOR C[i-1]
   // When we pass prevBlock as IV and targetBlock as ciphertext:
   //   P = D_K(targetBlock) XOR prevBlock
+  let paddingValid: boolean;
   try {
     await crypto.subtle.decrypt(
       { name: 'AES-CBC', iv: toAB(prevBlock) },
@@ -99,11 +186,19 @@ export async function queryOracle(
 
     // WebCrypto throws on invalid padding, so reaching here means valid padding.
     // The returned ArrayBuffer has PKCS#7 already stripped — do NOT re-validate it.
-    return { valid: true, queryCount: session.queryCount };
+    paddingValid = true;
   } catch {
     // AES-CBC decrypt threw — invalid padding
-    return { valid: false, queryCount: session.queryCount };
+    paddingValid = false;
   }
+
+  // Uniform-error server: the check above really ran, but its answer is not
+  // observable, so the attacker's one bit is always the same.
+  if (session.mode === 'silent') {
+    return { valid: false, queryCount: session.queryCount, reachedPaddingCheck: true };
+  }
+
+  return { valid: paddingValid, queryCount: session.queryCount, reachedPaddingCheck: true };
 }
 
 /**

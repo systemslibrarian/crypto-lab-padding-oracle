@@ -14,6 +14,8 @@ import {
   initPanel5,
   initPanel6,
   initP1OracleDemo,
+  initP1PaddingCraft,
+  initDefenseBench,
 } from './ui.ts';
 
 /**
@@ -48,4 +50,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initPanel5();
   initPanel6();
   initP1OracleDemo();
+  initP1PaddingCraft();
+  initDefenseBench();
 });

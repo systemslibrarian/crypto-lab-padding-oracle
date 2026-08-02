@@ -46,6 +46,26 @@ async function runDemo(page: Page): Promise<void> {
     await btn.click();
     await expect(page.locator('#p1-oracle-demo-result')).not.toBeEmpty();
   }
+
+  // Panel 1's padding-prediction exercise: its result block carries badges and
+  // an error-toned variant, so scan it populated.
+  await page.locator('#p1-craft-setup-btn').click();
+  await expect(page.locator('#p1-predict-valid-btn')).toBeEnabled();
+  await page.locator('#p1-craft-byte').selectOption('2');
+  await page.locator('#p1-predict-valid-btn').click();
+  await expect(page.locator('#p1-craft-result')).toContainText('The oracle answered');
+
+  // Panel 6's defense bench fills a table with badges in both tones.
+  await page.locator('#p6-bench-btn').click();
+  await expect(page.locator('#p6-bench-status')).toContainText('failed against both defended ones', {
+    timeout: 60_000,
+  });
+
+  // Panel 6's AEAD rejection block is an alert region with its own styling.
+  await page.locator('#p6-aead-btn').click();
+  await expect(page.locator('#p6-tamper-btn')).toBeEnabled();
+  await page.locator('#p6-tamper-btn').click();
+  await expect(page.locator('#p6-aead-result')).toContainText('REJECTED');
 }
 
 async function scan(page: Page): Promise<void> {

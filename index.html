@@ -334,6 +334,58 @@
                class="result-container"></div>
         </section>
 
+        <!-- Learner-driven padding craft: change the last decrypted byte, call it, then ask the real oracle -->
+        <section class="panel-section" aria-labelledby="p1-craft-heading">
+          <h3 id="p1-craft-heading" class="section-title">Your Turn: Craft the Last Padding Byte</h3>
+          <p>
+            Set up a ciphertext whose final block decrypts to a full padding block
+            (<code>10</code> repeated 16 times). You choose what the <em>last</em> decrypted byte becomes;
+            this page XORs the matching value into <code>C[n−1][15]</code> to force it, exactly as the
+            attack does. Commit to a prediction first — then the real WebCrypto oracle answers.
+          </p>
+
+          <div class="button-row">
+            <button id="p1-craft-setup-btn" type="button" class="btn btn--primary"
+                    aria-label="Set up the padding practice ciphertext">
+              Set Up Practice Ciphertext
+            </button>
+          </div>
+
+          <div class="control-row">
+            <label for="p1-craft-byte" class="control-label">Force last decrypted byte to:</label>
+            <select id="p1-craft-byte" class="select-input" aria-label="Value to force into the last decrypted byte">
+              <option value="0">0x00</option>
+              <option value="1" selected>0x01</option>
+              <option value="2">0x02</option>
+              <option value="3">0x03</option>
+              <option value="15">0x0f</option>
+              <option value="16">0x10</option>
+              <option value="65">0x41</option>
+            </select>
+          </div>
+
+          <div class="button-row">
+            <button id="p1-predict-valid-btn" type="button" class="btn btn--primary" disabled
+                    aria-label="Predict the oracle will call this padding valid">
+              Predict: Valid
+            </button>
+            <button id="p1-predict-invalid-btn" type="button" class="btn btn--attack" disabled
+                    aria-label="Predict the oracle will call this padding invalid">
+              Predict: Invalid
+            </button>
+          </div>
+
+          <div class="query-display">
+            Predictions correct: <strong id="p1-craft-correct">0</strong> of <strong id="p1-craft-total">0</strong>
+          </div>
+
+          <div id="p1-craft-result"
+               role="region"
+               aria-live="polite"
+               aria-label="Padding prediction result"
+               class="result-container"></div>
+        </section>
+
       </div>
     </section>
 
@@ -484,9 +536,18 @@
         <section class="panel-section" aria-labelledby="p3-controls-heading">
           <h3 id="p3-controls-heading" class="section-title">Live Block Recovery</h3>
 
-          <div class="info-box" role="note" aria-label="Fixed plaintext note">
-            Plaintext: <code>"Attack at dawn!!"</code> (exactly 16 bytes — one block).
-            The full block will be recovered byte-by-byte.
+          <div class="info-box" role="note" aria-label="Target block note">
+            The attack recovers <strong>block 0</strong> — the first 16 bytes of whatever you type.
+            Shorter messages are padded by PKCS#7 to fill the block; longer ones keep the rest of
+            their text in later blocks (Panel 4 recovers all of them).
+          </div>
+
+          <div class="control-row">
+            <label for="p3-plaintext" class="control-label">Target plaintext:</label>
+            <input id="p3-plaintext" type="text" class="text-input" value="Attack at dawn!!"
+                   maxlength="64" aria-describedby="p3-bytecount"
+                   aria-label="Plaintext to encrypt and then recover" />
+            <span id="p3-bytecount" class="control-hint">16 bytes</span>
           </div>
 
           <div class="control-row">
@@ -740,6 +801,57 @@
             </div>
           </article>
         </div>
+
+        <!-- Defense bench: the SAME attack, three servers -->
+        <section class="panel-section" aria-labelledby="p6-bench-heading">
+          <h3 id="p6-bench-heading" class="section-title">Same Attack, Three Servers</h3>
+          <p>
+            The cards above claim these defenses work. This runs the <em>identical</em> block-recovery
+            attack — the same <code>recoverBlock()</code> that empties Panel 3 — against three servers
+            that differ only in how they answer. Nothing is stubbed: when the attack fails it fails
+            because it exhausted all 256 probes for a byte and the oracle never varied.
+          </p>
+
+          <div class="control-row">
+            <label for="p6-bench-plaintext" class="control-label">Plaintext to attack:</label>
+            <input id="p6-bench-plaintext" type="text" class="text-input" value="Attack at dawn!!"
+                   maxlength="64" aria-label="Plaintext the three servers will protect" />
+          </div>
+
+          <div class="button-row">
+            <button id="p6-bench-btn" type="button" class="btn btn--attack"
+                    aria-label="Run the same attack against all three servers">
+              Run Attack Against All Three
+            </button>
+          </div>
+
+          <div id="p6-bench-status" role="status" aria-live="polite" class="status-display">
+            Not run yet.
+          </div>
+
+          <div class="comparison-table-wrapper" role="region" aria-label="Attack outcome per server mode">
+            <table class="comparison-table" aria-label="Attack outcome by server mode">
+              <thead>
+                <tr>
+                  <th scope="col">Server</th>
+                  <th scope="col">Outcome</th>
+                  <th scope="col">Oracle queries</th>
+                  <th scope="col">Padding checks reached</th>
+                  <th scope="col">MAC rejections</th>
+                </tr>
+              </thead>
+              <tbody id="p6-bench-rows">
+                <tr><td colspan="5">Run the attack to fill this in.</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div id="p6-bench-note"
+               role="region"
+               aria-live="polite"
+               aria-label="Defense bench summary"
+               class="result-container"></div>
+        </section>
 
         <!-- AEAD Live Demo -->
         <section class="panel-section" aria-labelledby="p6-aead-demo-heading">

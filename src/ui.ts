@@ -17,15 +17,17 @@ import {
   toBytes,
   fromBytes,
   stripPKCS7,
+  applyPKCS7,
   BLOCK_SIZE,
 } from './oracle.ts';
-import type { OracleSession } from './oracle.ts';
+import type { OracleMode, OracleSession } from './oracle.ts';
 import {
   fullCiphertextAttack,
   recoverBlock,
   theoreticalQueryCount,
+  trialAgainstMode,
 } from './attack.ts';
-import type { AttackEvent } from './attack.ts';
+import type { AttackEvent, DefenseTrial } from './attack.ts';
 import {
   BlockGrid,
   buildCBCDiagram,
@@ -440,19 +442,44 @@ export function initPanel3(): void {
     commentaryTextEl.innerHTML = html;
   }
 
+  const plaintextInput = document.getElementById('p3-plaintext') as HTMLInputElement | null;
+  const byteCountEl = document.getElementById('p3-bytecount');
+
   if (!encryptBtn || !runBtn) return;
 
-  // Use a fixed 16-byte plaintext so one ciphertext block is targeted
-  const FIXED_PLAINTEXT = 'Attack at dawn!!'; // exactly 16 bytes
+  // The learner types the block to be recovered. Block 0 is attacked, so the
+  // first 16 bytes of whatever they enter are what comes back.
+  function currentPlaintext(): string {
+    const value = plaintextInput?.value ?? '';
+    return value.length > 0 ? value : 'Attack at dawn!!';
+  }
+
+  function updateByteCount(): void {
+    if (!byteCountEl) return;
+    const len = toBytes(currentPlaintext()).length;
+    byteCountEl.textContent = len === BLOCK_SIZE
+      ? '16 bytes — exactly one block'
+      : `${len} byte${len === 1 ? '' : 's'} — block 0 is the first ${Math.min(len, BLOCK_SIZE)}${len < BLOCK_SIZE ? ' plus PKCS#7 padding' : ''}`;
+  }
+
+  plaintextInput?.addEventListener('input', () => {
+    updateByteCount();
+    // A new target invalidates the session encrypted from the old one.
+    p3Session = null;
+    runBtn.disabled = true;
+    if (statusEl) statusEl.textContent = 'Plaintext changed — click "Encrypt Target Block" again.';
+  });
+  updateByteCount();
 
   encryptBtn.addEventListener('click', async () => {
+    const targetPlaintext = currentPlaintext();
     try {
       encryptBtn.disabled = true;
-      p3Session = await createOracleSession(toBytes(FIXED_PLAINTEXT));
+      p3Session = await createOracleSession(toBytes(targetPlaintext));
 
-      if (statusEl) statusEl.textContent = `Plaintext: "${FIXED_PLAINTEXT}" encrypted. Click "Run Full Block" to start.`;
+      if (statusEl) statusEl.textContent = `Plaintext: "${targetPlaintext}" encrypted. Click "Run Full Block" to start.`;
       setP3Commentary(
-        `The plaintext "<strong>${escapeHtml(FIXED_PLAINTEXT)}</strong>" is now AES-CBC encrypted. ` +
+        `The plaintext "<strong>${escapeHtml(targetPlaintext)}</strong>" is now AES-CBC encrypted. ` +
         `The attack will recover all 16 bytes of this block, one at a time from right to left. ` +
         `For each byte position j, the oracle is queried with craft prefix bytes that force ` +
         `the desired PKCS#7 padding byte — revealing the intermediate value I[j] = AES⁻¹(C[n])[j].`
@@ -555,12 +582,23 @@ export function initPanel3(): void {
 
       // Show result
       const strippedPlain = stripPKCS7(plaintext) ?? plaintext;
+
+      // Grade the recovery against block 0 of what was actually encrypted. The
+      // attack path never reads session.plaintext, so this is the demo checking
+      // itself rather than restating its own input.
+      const expectedBlock = applyPKCS7(p3Session.plaintext).slice(0, BLOCK_SIZE);
+      const exactBlock =
+        plaintext.length === expectedBlock.length &&
+        plaintext.every((b, i) => b === expectedBlock[i]);
+
       if (resultEl) {
         const theoretic = theoreticalQueryCount(p3Session.ciphertext.length);
         resultEl.innerHTML = `
           <div class="result-block" role="region" aria-label="Full block recovery result">
             <div class="result-row"><span class="result-label">Recovered plaintext:</span>
               <span class="text-display">${escapeHtml(fromBytes(strippedPlain))}</span></div>
+            <div class="result-row"><span class="result-label">Checked against the encrypted block:</span>
+              <span class="badge badge--${exactBlock ? 'valid' : 'invalid'}">${exactBlock ? 'byte-for-byte match' : 'MISMATCH — the attack did not recover this block'}</span></div>
             <div class="result-row"><span class="result-label">Oracle queries used:</span>
               <span class="query-count">${p3Session.queryCount}</span></div>
             <div class="result-row"><span class="result-label">Theoretical O(256×16×blocks) worst case:</span>
@@ -922,6 +960,217 @@ export async function initP1OracleDemo(): Promise<void> {
       resultEl.innerHTML = `<p role="alert">Error: ${String(err)}</p>`;
     } finally {
       btn.disabled = false;
+    }
+  });
+}
+
+// ─── Panel 1: learner-crafted padding byte ───────────────────────────────────
+
+/**
+ * The learner picks what the final decrypted byte becomes, commits to a
+ * prediction, and only then does the real oracle answer.
+ *
+ * The forcing trick is the attack's own: the practice message is exactly one
+ * block, so WebCrypto appends a second block that decrypts to 0x10 sixteen
+ * times. XOR (0x10 ^ chosen) into C[n−1][15] and the receiver decrypts `chosen`
+ * in that position instead. The page knows the plaintext here — a real attacker
+ * would not — but the valid/invalid answer comes from WebCrypto, not from us.
+ */
+export function initP1PaddingCraft(): void {
+  const setupBtn = document.getElementById('p1-craft-setup-btn') as HTMLButtonElement | null;
+  const byteSelect = document.getElementById('p1-craft-byte') as HTMLSelectElement | null;
+  const predictValidBtn = document.getElementById('p1-predict-valid-btn') as HTMLButtonElement | null;
+  const predictInvalidBtn = document.getElementById('p1-predict-invalid-btn') as HTMLButtonElement | null;
+  const correctEl = document.getElementById('p1-craft-correct');
+  const totalEl = document.getElementById('p1-craft-total');
+  const resultEl = document.getElementById('p1-craft-result');
+
+  if (!setupBtn || !byteSelect || !predictValidBtn || !predictInvalidBtn || !resultEl) return;
+
+  const PRACTICE_TEXT = 'Padding practice';   // exactly 16 bytes
+  const PAD_BYTE = BLOCK_SIZE;                // the appended block is 0x10 x 16
+
+  let session: OracleSession | null = null;
+  let prevBlock: Uint8Array | null = null;
+  let targetBlock: Uint8Array | null = null;
+  let correct = 0;
+  let total = 0;
+
+  setupBtn.addEventListener('click', async () => {
+    setupBtn.disabled = true;
+    try {
+      session = await createOracleSession(toBytes(PRACTICE_TEXT));
+      const blocks = splitBlocks(session.ciphertext);
+      targetBlock = blocks[blocks.length - 1];
+      prevBlock = blocks.length > 1 ? blocks[blocks.length - 2] : session.iv;
+
+      resultEl.innerHTML = `
+        <div class="result-block" role="region" aria-label="Practice ciphertext ready">
+          <div class="result-row"><span class="result-label">Message:</span>
+            <span class="text-display">"${escapeHtml(PRACTICE_TEXT)}" (16 bytes, so PKCS#7 appends a whole padding block)</span></div>
+          <div class="result-row"><span class="result-label">Last block decrypts to:</span>
+            <span class="hex-display">${toHex(new Uint8Array(BLOCK_SIZE).fill(PAD_BYTE))}</span></div>
+          <p class="info-note" role="note">
+            Pick a value, decide whether the padding will still be valid, and press your prediction.
+          </p>
+        </div>
+      `;
+      predictValidBtn.disabled = false;
+      predictInvalidBtn.disabled = false;
+      announce('Practice ciphertext ready. Choose a byte and predict.');
+    } catch (err) {
+      resultEl.innerHTML = `<p role="alert">Error: ${String(err)}</p>`;
+    } finally {
+      setupBtn.disabled = false;
+    }
+  });
+
+  async function judge(predictedValid: boolean): Promise<void> {
+    if (!session || !prevBlock || !targetBlock || !resultEl || !byteSelect) return;
+
+    predictValidBtn!.disabled = true;
+    predictInvalidBtn!.disabled = true;
+
+    try {
+      const chosen = Number(byteSelect.value) & 0xff;
+
+      // Force the last decrypted byte to `chosen` without touching the key.
+      const modified = prevBlock.slice();
+      modified[BLOCK_SIZE - 1] ^= PAD_BYTE ^ chosen;
+
+      const answer = await queryOracle(session, modified, targetBlock);
+      const wasRight = answer.valid === predictedValid;
+
+      total++;
+      if (wasRight) correct++;
+      if (correctEl) correctEl.textContent = String(correct);
+      if (totalEl) totalEl.textContent = String(total);
+
+      // What the receiver now decrypts: 0x10 fifteen times, then the chosen byte.
+      const decrypted = new Uint8Array(BLOCK_SIZE).fill(PAD_BYTE);
+      decrypted[BLOCK_SIZE - 1] = chosen;
+
+      const hex = (b: number): string => `0x${b.toString(16).padStart(2, '0')}`;
+      const why = chosen === 0x01
+        ? `${hex(chosen)} claims one padding byte, and that one byte is itself — valid.`
+        : chosen === PAD_BYTE
+          ? `${hex(chosen)} claims sixteen padding bytes, and all sixteen really are 0x10 — valid.`
+          : chosen === 0
+            ? `${hex(chosen)} claims zero padding bytes, which PKCS#7 does not allow.`
+            : chosen > BLOCK_SIZE
+              ? `${hex(chosen)} claims more than 16 padding bytes, which cannot fit in a block.`
+              : `${hex(chosen)} claims ${chosen} padding bytes, so the ${chosen - 1} bytes before it would all have to be ${hex(chosen)} — they are 0x10.`;
+
+      resultEl.innerHTML = `
+        <div class="result-block ${wasRight ? '' : 'result-block--error'}" role="region" aria-label="Prediction result">
+          <div class="result-row"><span class="result-label">You predicted:</span>
+            <span class="badge badge--${predictedValid ? 'valid' : 'invalid'}">${predictedValid ? 'Valid' : 'Invalid'}</span></div>
+          <div class="result-row"><span class="result-label">The oracle answered:</span>
+            <span class="badge badge--${answer.valid ? 'valid' : 'invalid'}">${answer.valid ? 'Valid ✓' : 'Invalid ✗'}</span></div>
+          <div class="result-row"><span class="result-label">Verdict:</span>
+            <span class="text-display">${wasRight ? 'Correct.' : 'Not this time.'}</span></div>
+          <div class="result-row"><span class="result-label">Block the receiver decrypted:</span>
+            <span class="hex-display">${toHex(decrypted)}</span></div>
+          <div class="result-row"><span class="result-label">Why:</span>
+            <span class="text-display">${escapeHtml(why)}</span></div>
+          <div class="result-row"><span class="result-label">Oracle queries so far:</span>
+            <span class="query-count">${answer.queryCount}</span></div>
+        </div>
+      `;
+      announce(`Oracle said ${answer.valid ? 'valid' : 'invalid'}. Your prediction was ${wasRight ? 'correct' : 'wrong'}.`);
+    } catch (err) {
+      resultEl.innerHTML = `<p role="alert">Error: ${String(err)}</p>`;
+    } finally {
+      predictValidBtn!.disabled = false;
+      predictInvalidBtn!.disabled = false;
+    }
+  }
+
+  predictValidBtn.addEventListener('click', () => { void judge(true); });
+  predictInvalidBtn.addEventListener('click', () => { void judge(false); });
+}
+
+// ─── Panel 6: the same attack against three servers ──────────────────────────
+
+const MODE_LABELS: Record<OracleMode, string> = {
+  leaky: 'Leaky CBC — padding errors are observable',
+  silent: 'Silent CBC — one uniform error for every failure',
+  etm: 'Encrypt-then-MAC — MAC verified before decryption',
+};
+
+export function initDefenseBench(): void {
+  const runBtn = document.getElementById('p6-bench-btn') as HTMLButtonElement | null;
+  const input = document.getElementById('p6-bench-plaintext') as HTMLInputElement | null;
+  const statusEl = document.getElementById('p6-bench-status');
+  const rowsEl = document.getElementById('p6-bench-rows');
+  const noteEl = document.getElementById('p6-bench-note');
+
+  if (!runBtn || !rowsEl) return;
+
+  runBtn.addEventListener('click', async () => {
+    runBtn.disabled = true;
+    const text = input?.value?.length ? input.value : 'Attack at dawn!!';
+    rowsEl.innerHTML = '<tr><td colspan="5">Running…</td></tr>';
+    if (statusEl) statusEl.textContent = 'Running the same attack against each server…';
+
+    try {
+      const modes: OracleMode[] = ['leaky', 'silent', 'etm'];
+      const trials: DefenseTrial[] = [];
+
+      for (const mode of modes) {
+        // Same plaintext, same attack code — only the server's behaviour differs.
+        trials.push(await trialAgainstMode(toBytes(text), mode));
+      }
+
+      rowsEl.innerHTML = trials.map((trial) => {
+        const outcome = trial.failure === null
+          ? `<span class="badge badge--invalid">plaintext recovered</span> "${escapeHtml(fromBytes(trial.recovered ? (stripPKCS7(trial.recovered) ?? trial.recovered) : new Uint8Array()))}"${trial.matchedPlaintext ? ' — byte-for-byte match' : ' — DID NOT match the encrypted block'}`
+          : `<span class="badge badge--valid">attack failed</span> ${escapeHtml(trial.failure)} (${trial.bytesRecovered} of 16 bytes)`;
+        return `
+          <tr>
+            <th scope="row">${escapeHtml(MODE_LABELS[trial.mode])}</th>
+            <td>${outcome}</td>
+            <td class="query-count">${trial.queryCount.toLocaleString()}</td>
+            <td class="query-count">${trial.paddingChecks.toLocaleString()}</td>
+            <td class="query-count">${trial.macRejections.toLocaleString()}</td>
+          </tr>
+        `;
+      }).join('');
+
+      const leaky = trials[0];
+      const silent = trials[1];
+      const etm = trials[2];
+
+      if (statusEl) {
+        statusEl.textContent = leaky.failure === null && silent.failure !== null && etm.failure !== null
+          ? 'Attack succeeded against the leaky server and failed against both defended ones.'
+          : 'Unexpected outcome — see the table.';
+      }
+
+      if (noteEl) {
+        noteEl.innerHTML = `
+          <div class="result-block" role="region" aria-label="Defense bench summary">
+            <p>
+              The leaky server gave up its block in <strong>${leaky.queryCount.toLocaleString()}</strong> queries.
+              The silent server ran <strong>${silent.paddingChecks.toLocaleString()}</strong> padding checks and still
+              starved the attack — it never withheld the computation, only the answer, and one bit that never
+              changes is no bit at all.
+              Encrypt-then-MAC reached the padding check <strong>${etm.paddingChecks.toLocaleString()}</strong>
+              times: every one of its <strong>${etm.macRejections.toLocaleString()}</strong> queries died at MAC
+              verification, before AES-CBC decryption was attempted.
+            </p>
+            <p class="info-note" role="note">
+              Silent-mode's protection is the fragile one. A real deployment leaks the same bit through response
+              timing, log volume, or downstream behaviour — which is exactly how Lucky Thirteen beat "constant"
+              error handling. Only authentication removes the oracle rather than hiding it.
+            </p>
+          </div>
+        `;
+      }
+    } catch (err) {
+      if (statusEl) statusEl.textContent = `Error: ${String(err)}`;
+    } finally {
+      runBtn.disabled = false;
     }
   });
 }

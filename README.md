@@ -18,6 +18,26 @@
 
 The demo has six tabbed panels. Panels 2–4 let you encrypt arbitrary plaintext with a random AES-128-CBC key, then run the full padding oracle attack at adjustable speeds (slow/medium/fast) while watching byte-by-byte recovery on an interactive grid. Panel 6 lets you encrypt with AES-256-GCM, tamper with the ciphertext, and see authentication fail with no plaintext revealed.
 
+Four parts of the page are exercises rather than statements:
+
+- **Panel 1 — craft the last padding byte.** Set up a ciphertext whose final block decrypts to a full padding block, choose what its last decrypted byte becomes (the page XORs the difference into `C[n−1][15]`, exactly as the attack does), and commit to *valid* or *invalid* before the real WebCrypto oracle answers. Your running score is kept.
+- **Panel 3 — you pick the target block.** The plaintext to recover is typed by the learner, with a live byte count, instead of being fixed in the source.
+- **Panel 6 — the same attack against three servers.** The identical `recoverBlock()` runs against a leaky server, a server that performs the same padding check but collapses every failure into one uniform error, and an Encrypt-then-MAC server. The leaky one gives up its plaintext; against the other two the attack genuinely fails — it exhausts all 256 probes for a byte and stops. The table reports oracle queries, how many reached the padding check, and how many died at MAC verification, so "this defense works" is a counter rather than a caption.
+- **Panels 3 and 4 — graded recovery.** Both compare the recovered bytes against the plaintext the session actually encrypted and print a byte-for-byte match badge (or a mismatch), rather than echoing the input back.
+
+## Testing
+
+```bash
+npm test          # node --test: the attack engine, plus the three server modes
+npm run type-check
+npm run test:a11y # Playwright: WCAG A/AA scan and the functional exhibit gates
+```
+
+`e2e/attack.spec.ts` drives the shipped page: recovered plaintext and the byte-for-byte badges,
+the oracle query counters, the AES-GCM rejection (and that the protected message never appears),
+the learner padding predictions, and the defense bench — including the two servers the attack must
+fail against.
+
 ## What Can Go Wrong
 
 - **Distinguishable error responses** — returning HTTP 500 for padding errors versus HTTP 200 for other failures gives an attacker a direct one-bit oracle; this is exactly what broke ASP.NET (MS10-070 / CVE-2010-3332).

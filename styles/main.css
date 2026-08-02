@@ -402,7 +402,11 @@ a:hover { text-decoration: none; }
 }
 .btn--attack {
   background: transparent;
-  color: var(--color-invalid);
+  /* Label uses the -text ramp, not the border hue: --color-invalid is only
+     4.07:1 on --color-bg-3, which fails 1.4.3 as soon as an attack button is
+     enabled on a panel-section surface. The border keeps the saturated hue —
+     3:1 is the 1.4.11 bar for a non-text boundary. */
+  color: var(--color-invalid-text);
   border-color: var(--color-invalid);
 }
 .btn--attack:hover:not(:disabled) {
@@ -1605,3 +1609,9 @@ a:hover { text-decoration: none; }
 /* ═══ Accessibility: faint-text contrast overrides (auto-added) ═══ */
 [data-theme="light"] .section-title--valid,
 [data-theme="light"] .cbc-padding-check__result { color: #0f7234; } /* was #16a34a, now ≥4.6:1 on theme surfaces */
+
+/* Inline hint beside an input (e.g. the live byte count in Panel 3). */
+.control-hint {
+  font-size: 0.8125rem;
+  color: var(--color-text-2);
+}
