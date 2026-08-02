@@ -1094,7 +1094,7 @@ export function initP1PaddingCraft(): void {
 
 const MODE_LABELS: Record<OracleMode, string> = {
   leaky: 'Leaky CBC — padding errors are observable',
-  silent: 'Silent CBC — one uniform error for every failure',
+  silent: 'Silent CBC — same response whatever the padding check said',
   etm: 'Encrypt-then-MAC — MAC verified before decryption',
 };
 
@@ -1153,8 +1153,9 @@ export function initDefenseBench(): void {
             <p>
               The leaky server gave up its block in <strong>${leaky.queryCount.toLocaleString()}</strong> queries.
               The silent server ran <strong>${silent.paddingChecks.toLocaleString()}</strong> padding checks and still
-              starved the attack — it never withheld the computation, only the answer, and one bit that never
-              changes is no bit at all.
+              starved the attack — it withheld the answer, not the computation, and one bit that never changes is
+              no bit at all. It is modelled here as one constant response to every submission, which is what an
+              attacker sees from a server that reveals nothing about how a message was processed.
               Encrypt-then-MAC reached the padding check <strong>${etm.paddingChecks.toLocaleString()}</strong>
               times: every one of its <strong>${etm.macRejections.toLocaleString()}</strong> queries died at MAC
               verification, before AES-CBC decryption was attempted.

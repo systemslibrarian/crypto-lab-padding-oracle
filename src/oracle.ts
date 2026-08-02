@@ -27,9 +27,11 @@ function toAB(u8: Uint8Array): Uint8Array<ArrayBuffer> {
  *
  * - `leaky`  — the vulnerable case: padding validity is observable (HTTP 500 vs
  *              200, a TLS alert, a timing difference). One bit per query.
- * - `silent` — the server still decrypts and still checks padding, but collapses
- *              every failure into one uniform error, so the attacker's
- *              observation never changes.
+ * - `silent` — the server still decrypts and still checks padding, but its
+ *              response is identical whatever the check said, so the attacker's
+ *              observation never changes. Modelled here as a constant answer to
+ *              every submission: this is the attacker's view of a server that
+ *              reveals nothing about how a message was processed.
  * - `etm`    — Encrypt-then-MAC: a MAC over the submitted ciphertext is verified
  *              first, and anything the attacker modified is rejected before AES
  *              decryption is attempted at all.
