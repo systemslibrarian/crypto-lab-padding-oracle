@@ -190,33 +190,6 @@ function stateText(state: ByteState): string {
 }
 
 /**
- * Render a static hex row for displaying ciphertext blocks.
- */
-export function renderHexRow(
-  container: HTMLElement,
-  data: Uint8Array,
-  label: string,
-  highlightIndex?: number
-): void {
-  container.innerHTML = '';
-  container.setAttribute('aria-label', label);
-  container.setAttribute('role', 'group');
-
-  const bytes = Array.from(data);
-  bytes.forEach((byte, i) => {
-    const span = document.createElement('span');
-    span.className = 'hex-byte';
-    if (i === highlightIndex) {
-      span.classList.add('hex-byte--highlight');
-      span.setAttribute('aria-current', 'true');
-    }
-    span.textContent = byte.toString(16).padStart(2, '0');
-    span.setAttribute('aria-label', `byte ${i + 1}: 0x${byte.toString(16).padStart(2, '0')}`);
-    container.appendChild(span);
-  });
-}
-
-/**
  * Render a multi-block ciphertext visualization.
  * Returns an array of block containers for per-block updates.
  */
@@ -254,6 +227,10 @@ function createBlockEl(
 ): HTMLElement {
   const wrapper = document.createElement('div');
   wrapper.className = `cipher-block ${active ? 'cipher-block--active' : ''}`;
+  // role="img": both children are already `aria-hidden`, so this box's entire
+  // accessible content IS its label — and a name on a role-less <div> is
+  // prohibited by ARIA and silently discarded, which is what was happening.
+  wrapper.setAttribute('role', 'img');
   wrapper.setAttribute('aria-label', `${label}: ${Array.from(data).map(b => b.toString(16).padStart(2, '0')).join(' ')}`);
 
   const titleEl = document.createElement('div');
@@ -263,8 +240,9 @@ function createBlockEl(
 
   const hexEl = document.createElement('div');
   hexEl.className = 'cipher-block__hex';
+  // No aria-label: the element is `aria-hidden`, so the name was dead weight —
+  // and it was prohibited here anyway (role-less <div>).
   hexEl.setAttribute('aria-hidden', 'true');
-  hexEl.setAttribute('aria-label', `${label} hex bytes`);
 
   Array.from(data).forEach((byte, i) => {
     const span = document.createElement('span');
@@ -333,19 +311,6 @@ export function buildCBCDiagram(container: HTMLElement): void {
       </div>
     </div>
   `;
-}
-
-/**
- * Create an oracle query counter display.
- */
-export function createQueryCounter(container: HTMLElement): HTMLElement {
-  container.innerHTML = `
-    <div class="query-counter" role="status" aria-live="polite" aria-label="Oracle query counter">
-      <span class="query-counter__label">Oracle Queries:</span>
-      <span class="query-counter__value" id="query-count-value">0</span>
-    </div>
-  `;
-  return container.querySelector('#query-count-value') as HTMLElement;
 }
 
 /**

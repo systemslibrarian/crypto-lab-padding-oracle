@@ -80,7 +80,25 @@ export function initPanelNav(): void {
   const tabs = document.querySelectorAll<HTMLButtonElement>('.panel-tab');
   const panels = document.querySelectorAll<HTMLElement>('.panel');
 
-  function activateTab(index: number): void {
+  /**
+   * `byUser` is load-bearing, not a nicety.
+   *
+   * `scrollIntoView()` moves Chromium's *sequential focus navigation starting
+   * point* to the element it scrolls to. Calling it during mount therefore
+   * parked that starting point on the tab bar, and the first Tab a keyboard
+   * visitor pressed on arrival landed on `#p1-oracle-demo-btn` — INSIDE panel 1
+   * — skipping both skip links, the whole shared header and all six tabs. The
+   * skip link exists precisely to be the first tab stop (WCAG 2.4.1), and it was
+   * unreachable in the forward direction. Verified by blocking the bundle: with
+   * no JS the first Tab reaches `.cl-skip-link`; with it, it did not.
+   *
+   * The same argument applies to `announce()`: a live-region message fired at
+   * mount is spoken to a screen-reader user who has not done anything yet.
+   *
+   * Both are wanted when the reader really did switch tabs — a click or an arrow
+   * key has already set the starting point to that tab — so both are kept there.
+   */
+  function activateTab(index: number, byUser: boolean): void {
     tabs.forEach((tab, i) => {
       const active = i === index;
       tab.setAttribute('aria-selected', active ? 'true' : 'false');
@@ -90,13 +108,14 @@ export function initPanelNav(): void {
       panel.hidden = i !== index;
       if (i === index) panel.setAttribute('tabindex', '-1');
     });
+    if (!byUser) return;
     // Keep the active tab fully visible in the horizontally-scrolling bar (mobile).
     tabs[index]?.scrollIntoView({ block: 'nearest', inline: 'center' });
     announce(`Panel ${index + 1}: ${tabs[index]?.textContent?.trim() ?? ''}`);
   }
 
   tabs.forEach((tab, i) => {
-    tab.addEventListener('click', () => activateTab(i));
+    tab.addEventListener('click', () => activateTab(i, true));
     tab.addEventListener('keydown', (e) => {
       let next = i;
       if (e.key === 'ArrowRight') next = (i + 1) % tabs.length;
@@ -105,13 +124,13 @@ export function initPanelNav(): void {
       else if (e.key === 'End') next = tabs.length - 1;
       else return;
       e.preventDefault();
-      activateTab(next);
+      activateTab(next, true);
       tabs[next]?.focus();
     });
   });
 
-  // Activate first panel on load
-  activateTab(0);
+  // Activate first panel on load. Not `byUser`: see activateTab.
+  activateTab(0, false);
 }
 
 // ─── Panel 1: CBC Mode and PKCS#7 Refresher ──────────────────────────────────
@@ -148,6 +167,11 @@ export function initPanel1(): void {
 
       const bytes = document.createElement('div');
       bytes.className = 'padding-example__bytes';
+      // role="img" + aria-label, not a bare aria-label. A name on a role-less
+      // <div> is prohibited by ARIA and silently dropped; role="img" is the
+      // accurate role for a run of hex cells whose meaning is the sentence in the
+      // label, and it stops each byte being spelled out one span at a time.
+      bytes.setAttribute('role', 'img');
       bytes.setAttribute('aria-label', `${ex.desc}: ${ex.bytes.map(b => '0x' + b.toString(16).padStart(2, '0')).join(', ')}`);
 
       ex.bytes.forEach((byte, i) => {
@@ -179,6 +203,7 @@ export function initPanel1(): void {
     valid.forEach(ex => {
       const row = document.createElement('div');
       row.className = 'padding-valid-example';
+      row.setAttribute('role', 'img');
       row.setAttribute('aria-label', ex.label + ' (valid padding)');
       ex.bytes.forEach((b, i) => {
         const span = document.createElement('span');
@@ -189,7 +214,6 @@ export function initPanel1(): void {
       });
       const badge = document.createElement('span');
       badge.className = 'badge badge--valid';
-      badge.setAttribute('aria-label', 'Valid padding');
       badge.textContent = 'Valid ✓';
       row.appendChild(badge);
       validPaddingEl.appendChild(row);
@@ -205,6 +229,7 @@ export function initPanel1(): void {
     invalid.forEach(ex => {
       const row = document.createElement('div');
       row.className = 'padding-invalid-example';
+      row.setAttribute('role', 'img');
       row.setAttribute('aria-label', ex.label + ' (invalid padding)');
       ex.bytes.forEach(b => {
         const span = document.createElement('span');
@@ -214,7 +239,6 @@ export function initPanel1(): void {
       });
       const badge = document.createElement('span');
       badge.className = 'badge badge--invalid';
-      badge.setAttribute('aria-label', 'Invalid padding');
       badge.textContent = 'Invalid ✗';
       row.appendChild(badge);
       invalidPaddingEl.appendChild(row);
@@ -268,6 +292,17 @@ export function initPanel2(): void {
         cipherDisplay.textContent = toHex(p2Session.ciphertext);
         cipherDisplay.setAttribute('aria-label', `Ciphertext: ${toHex(p2Session.ciphertext)}`);
       }
+
+      // A new session must not leave the PREVIOUS one's readouts on screen. The
+      // query count and the result block were only cleared when Run was pressed,
+      // so after Encrypt the panel showed "Session ready" above a fully-recovered
+      // green grid, a stale query total and the plaintext of a DIFFERENT
+      // ciphertext — which a reader has every reason to read as belonging to the
+      // session just created.
+      p2Session.queryCount = 0;
+      if (queryCountEl) queryCountEl.textContent = '0';
+      if (resultEl) resultEl.innerHTML = '';
+      if (byteGridEl) byteGridEl.innerHTML = '';
 
       if (statusEl) statusEl.textContent = 'Session ready. Click "Run Attack" to start.';
       setP2Commentary(
@@ -376,12 +411,18 @@ export function initPanel2(): void {
               appended because the message length is a multiple of 16. The attack recovered it correctly —
               the message bytes live in the earlier blocks (try Panel 4 for full multi-block recovery).</span></div>`
           : '';
+        // No `role="region"` on `.result-block`. Every one of these panels already
+        // renders its results INTO a container that is a labelled region
+        // (`#p2-result`, `#p3-result`, …), so wrapping the injected markup in a
+        // second region with the same label produced two landmarks with identical
+        // role+name — axe's `landmark-unique`, and for a screen-reader user a
+        // duplicated "Attack result, region" with nothing to tell them apart.
         resultEl.innerHTML = `
-          <div class="result-block" role="region" aria-label="Attack result">
+          <div class="result-block">
             <div class="result-row"><span class="result-label">Recovered ${isFullPaddingBlock ? 'block' : 'plaintext'} (hex):</span>
-              <span class="hex-display" aria-label="Hex: ${escapeHtml(hex)}">${escapeHtml(hex)}</span></div>
+              <span class="hex-display">${escapeHtml(hex)}</span></div>
             <div class="result-row"><span class="result-label">Recovered plaintext (text):</span>
-              <span class="text-display" aria-label="Text: ${escapeHtml(text)}">${escapeHtml(text) || '<em>(empty — this block was pure padding)</em>'}</span></div>
+              <span class="text-display">${escapeHtml(text) || '<em>(empty — this block was pure padding)</em>'}</span></div>
             ${paddingNote}
             <div class="result-row"><span class="result-label">Total oracle queries:</span>
               <span class="query-count">${(lastEvent as AttackEvent | null)?.queryCount ?? 0}</span></div>
@@ -594,7 +635,7 @@ export function initPanel3(): void {
       if (resultEl) {
         const theoretic = theoreticalQueryCount(p3Session.ciphertext.length);
         resultEl.innerHTML = `
-          <div class="result-block" role="region" aria-label="Full block recovery result">
+          <div class="result-block">
             <div class="result-row"><span class="result-label">Recovered plaintext:</span>
               <span class="text-display">${escapeHtml(fromBytes(strippedPlain))}</span></div>
             <div class="result-row"><span class="result-label">Checked against the encrypted block:</span>
@@ -763,9 +804,9 @@ export function initPanel4(): void {
       if (resultEl) {
         const info = theoreticalQueryCount(p4Session.ciphertext.length);
         resultEl.innerHTML = `
-          <div class="result-block" role="region" aria-label="Full decryption result">
+          <div class="result-block">
             <div class="result-row"><span class="result-label">Recovered plaintext:</span>
-              <blockquote class="recovered-text" aria-label="Recovered plaintext: ${escapeHtml(recoveredText)}">${escapeHtml(recoveredText)}</blockquote></div>
+              <blockquote class="recovered-text">${escapeHtml(recoveredText)}</blockquote></div>
             <div class="result-row"><span class="result-label">Checked against the encrypted plaintext:</span>
               <span class="badge badge--${exact ? 'valid' : 'invalid'}">${exact ? 'byte-for-byte match' : 'MISMATCH — the attack did not fully recover it'}</span></div>
             <div class="result-row"><span class="result-label">Total oracle queries:</span>
@@ -842,7 +883,7 @@ async function initAEADDemo(): Promise<void> {
       resultEl.innerHTML = `
         <div class="result-block">
           <div class="result-row"><span class="result-label">AES-GCM key (256-bit):</span>
-            <span class="badge badge--valid" aria-label="Key generated">Generated (not extractable)</span></div>
+            <span class="badge badge--valid">Generated (not extractable)</span></div>
           <div class="result-row"><span class="result-label">IV (96-bit):</span>
             <span class="hex-display">${toHex(aeadIV)}</span></div>
           <div class="result-row"><span class="result-label">Ciphertext + auth tag:</span>
@@ -935,16 +976,16 @@ export async function initP1OracleDemo(): Promise<void> {
       const invalidResult = await queryOracle(session, invalidPrev, targetBlock);
 
       resultEl.innerHTML = `
-        <div class="result-block" role="region" aria-label="Oracle demo results">
+        <div class="result-block">
           <div class="result-row">
             <span class="result-label">Query 1 (unmodified C[n-1]):</span>
-            <span class="badge badge--${validResult.valid ? 'valid' : 'invalid'}" aria-label="${validResult.valid ? 'Valid' : 'Invalid'} padding">
+            <span class="badge badge--${validResult.valid ? 'valid' : 'invalid'}">
               ${validResult.valid ? 'Valid ✓' : 'Invalid ✗'}
             </span>
           </div>
           <div class="result-row">
             <span class="result-label">Query 2 (zeroed C[n-1]):</span>
-            <span class="badge badge--${invalidResult.valid ? 'valid' : 'invalid'}" aria-label="${invalidResult.valid ? 'Valid' : 'Invalid'} padding">
+            <span class="badge badge--${invalidResult.valid ? 'valid' : 'invalid'}">
               ${invalidResult.valid ? 'Valid ✓' : 'Invalid ✗'}
             </span>
           </div>
@@ -1005,7 +1046,7 @@ export function initP1PaddingCraft(): void {
       prevBlock = blocks.length > 1 ? blocks[blocks.length - 2] : session.iv;
 
       resultEl.innerHTML = `
-        <div class="result-block" role="region" aria-label="Practice ciphertext ready">
+        <div class="result-block">
           <div class="result-row"><span class="result-label">Message:</span>
             <span class="text-display">"${escapeHtml(PRACTICE_TEXT)}" (16 bytes, so PKCS#7 appends a whole padding block)</span></div>
           <div class="result-row"><span class="result-label">Last block decrypts to:</span>
@@ -1062,7 +1103,7 @@ export function initP1PaddingCraft(): void {
               : `${hex(chosen)} claims ${chosen} padding bytes, so the ${chosen - 1} bytes before it would all have to be ${hex(chosen)} — they are 0x10.`;
 
       resultEl.innerHTML = `
-        <div class="result-block ${wasRight ? '' : 'result-block--error'}" role="region" aria-label="Prediction result">
+        <div class="result-block ${wasRight ? '' : 'result-block--error'}">
           <div class="result-row"><span class="result-label">You predicted:</span>
             <span class="badge badge--${predictedValid ? 'valid' : 'invalid'}">${predictedValid ? 'Valid' : 'Invalid'}</span></div>
           <div class="result-row"><span class="result-label">The oracle answered:</span>
@@ -1149,7 +1190,7 @@ export function initDefenseBench(): void {
 
       if (noteEl) {
         noteEl.innerHTML = `
-          <div class="result-block" role="region" aria-label="Defense bench summary">
+          <div class="result-block">
             <p>
               The leaky server gave up its block in <strong>${leaky.queryCount.toLocaleString()}</strong> queries.
               The silent server ran <strong>${silent.paddingChecks.toLocaleString()}</strong> padding checks and still

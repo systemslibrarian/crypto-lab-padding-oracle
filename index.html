@@ -135,7 +135,13 @@
     .cl-btn,.cl-icon{min-width:44px}
   }
 </style>
-<a class="cl-skip-link" href="#app">Skip to content</a>
+<!-- The fleet template ships this pointing at `#app`, which is the id most labs
+     give their root. This lab's main region is `<main id="main-content">` and it
+     has no `#app` at all, so the link was resolving to nothing: the first
+     focusable element on the page moved focus nowhere and the sticky bar could
+     not be bypassed (WCAG 2.4.1). axe never reported it — its `skip-link` rule is
+     best-practice, not WCAG-tagged, so `withTags` does not run it. -->
+<a class="cl-skip-link" href="#main-content">Skip to content</a>
 <header class="cl-topbar" role="banner" aria-label="Crypto Lab">
   <a class="cl-brand" href="https://crypto-lab.systemslibrarian.dev/" aria-label="Crypto Lab home">
     <span class="cl-badge">CL</span>
@@ -263,7 +269,14 @@
         <!-- CBC decryption diagram -->
         <section class="panel-section" aria-labelledby="p1-cbc-heading">
           <h3 id="p1-cbc-heading" class="section-title">CBC Decryption Flow</h3>
-          <div id="p1-cbc-diagram" class="diagram-container" aria-label="CBC decryption diagram"></div>
+          <!-- `role="group"` and `tabindex="0"` are both required, for two different
+               reasons. `.diagram-container` is `overflow-x: auto` around a
+               `min-width: 340px` figure, so at phone width it is a scrolling region
+               with no focusable content inside it — unreachable from a keyboard
+               (WCAG 2.1.1) until it is itself a tab stop. And `aria-label` on a
+               role-less <div> is PROHIBITED and silently discarded; axe files that
+               under `incomplete`, never under `violations`. -->
+          <div id="p1-cbc-diagram" class="diagram-container" role="group" tabindex="0" aria-label="CBC decryption diagram"></div>
           <p class="panel-note" role="note">
             The padding check at the end is the oracle. An HTTP 200 vs 500, a TLS alert code,
             or even a measurable timing difference — all are sufficient to mount the full attack.
@@ -277,18 +290,22 @@
             If <em>n</em> bytes of padding are needed, all <em>n</em> bytes must equal <em>n</em>.
             A full block of padding (n = 16) is always appended if plaintext fits exactly.
           </p>
-          <div id="p1-padding-examples" aria-label="PKCS#7 padding examples"></div>
+          <!-- role="group": `aria-label` on a role-less <div> is PROHIBITED by ARIA and
+               silently discarded, and axe files it under `incomplete` rather than
+               `violations`, so a violations-only gate never saw it. Every named
+               container on this page carries a real role for the same reason. -->
+          <div id="p1-padding-examples" role="group" aria-label="PKCS#7 padding examples"></div>
         </section>
 
         <!-- Valid vs invalid examples -->
         <div class="two-col" role="group" aria-label="Valid and invalid padding examples">
           <section class="panel-section" aria-labelledby="p1-valid-heading">
             <h3 id="p1-valid-heading" class="section-title section-title--valid">Valid Padding</h3>
-            <div id="p1-valid-padding" class="padding-examples-group" aria-label="Valid padding examples"></div>
+            <div id="p1-valid-padding" class="padding-examples-group" role="group" aria-label="Valid padding examples"></div>
           </section>
           <section class="panel-section" aria-labelledby="p1-invalid-heading">
             <h3 id="p1-invalid-heading" class="section-title section-title--invalid">Invalid Padding</h3>
-            <div id="p1-invalid-padding" class="padding-examples-group" aria-label="Invalid padding examples"></div>
+            <div id="p1-invalid-padding" class="padding-examples-group" role="group" aria-label="Invalid padding examples"></div>
           </section>
         </div>
 
@@ -296,23 +313,23 @@
         <section class="panel-section" aria-labelledby="p1-oracle-heading">
           <h3 id="p1-oracle-heading" class="section-title">The Oracle</h3>
           <div class="oracle-examples" role="group" aria-label="Real-world oracle examples">
-            <div class="oracle-example" aria-label="HTTP oracle example">
+            <div class="oracle-example" role="group" aria-label="HTTP oracle example">
               <span class="oracle-example__label">HTTP</span>
-              <span class="badge badge--valid" aria-label="Valid padding produces HTTP 200">HTTP 200 = Valid</span>
+              <span class="badge badge--valid">HTTP 200 = Valid</span>
               <span class="oracle-example__sep" aria-hidden="true">vs</span>
-              <span class="badge badge--invalid" aria-label="Invalid padding produces HTTP 500">HTTP 500 = Invalid</span>
+              <span class="badge badge--invalid">HTTP 500 = Invalid</span>
             </div>
-            <div class="oracle-example" aria-label="TLS oracle example">
+            <div class="oracle-example" role="group" aria-label="TLS oracle example">
               <span class="oracle-example__label">TLS</span>
-              <span class="badge badge--valid" aria-label="Valid padding produces Handshake alert">Handshake Alert = Valid</span>
+              <span class="badge badge--valid">Handshake Alert = Valid</span>
               <span class="oracle-example__sep" aria-hidden="true">vs</span>
-              <span class="badge badge--invalid" aria-label="Invalid padding produces Bad record MAC alert">Bad Record MAC = Invalid</span>
+              <span class="badge badge--invalid">Bad Record MAC = Invalid</span>
             </div>
-            <div class="oracle-example" aria-label="Timing oracle example">
+            <div class="oracle-example" role="group" aria-label="Timing oracle example">
               <span class="oracle-example__label">Timing</span>
-              <span class="badge badge--valid" aria-label="Valid padding is faster">Faster response = Valid</span>
+              <span class="badge badge--valid">Faster response = Valid</span>
               <span class="oracle-example__sep" aria-hidden="true">vs</span>
-              <span class="badge badge--invalid" aria-label="Invalid padding is slower">Slower response = Invalid</span>
+              <span class="badge badge--invalid">Slower response = Invalid</span>
             </div>
           </div>
           <p class="panel-note" role="note">
@@ -402,23 +419,23 @@
 
         <div class="step-flow" role="list" aria-label="Single byte recovery steps">
           <div class="step" role="listitem">
-            <span class="step__num" aria-label="Step 1">1</span>
+            <span class="step__num"><span class="sr-only">Step 1: </span><span aria-hidden="true">1</span></span>
             <p>Modify last byte of C[n−1] — try all 256 values (0x00–0xFF)</p>
           </div>
           <div class="step" role="listitem">
-            <span class="step__num" aria-label="Step 2">2</span>
+            <span class="step__num"><span class="sr-only">Step 2: </span><span aria-hidden="true">2</span></span>
             <p>Submit modified (C[n−1]′, C[n]) to the oracle</p>
           </div>
           <div class="step" role="listitem">
-            <span class="step__num" aria-label="Step 3">3</span>
+            <span class="step__num"><span class="sr-only">Step 3: </span><span aria-hidden="true">3</span></span>
             <p>Find the value that produces valid 0x01 padding: <code>AES⁻¹(C[n]) ⊕ C[n−1]′ = 0x01</code></p>
           </div>
           <div class="step" role="listitem">
-            <span class="step__num" aria-label="Step 4">4</span>
+            <span class="step__num"><span class="sr-only">Step 4: </span><span aria-hidden="true">4</span></span>
             <p>XOR with 0x01 to recover intermediate: <code>I[15] = probe ⊕ 0x01</code></p>
           </div>
           <div class="step" role="listitem">
-            <span class="step__num" aria-label="Step 5">5</span>
+            <span class="step__num"><span class="sr-only">Step 5: </span><span aria-hidden="true">5</span></span>
             <p>XOR I[15] with original C[n−1][15] to recover: <code>P[15] = I[15] ⊕ C[n−1][15]</code></p>
           </div>
         </div>
@@ -601,9 +618,15 @@
 
         <section class="panel-section" aria-labelledby="p3-xor-heading">
           <h3 id="p3-xor-heading" class="section-title">XOR: Intermediate ⊕ C[n−1] = Plaintext</h3>
+          <!-- tabindex="0": `.xor-display` is `overflow-x: auto` around a
+               nowrap row of 16 hex bytes (689px wide at phone width), and it
+               holds nothing focusable, so without a tab stop of its own there is
+               no keyboard route to the two thirds of it that are off screen
+               (WCAG 2.1.1). Same reasoning for the two comparison tables below. -->
           <div id="p3-xor-display"
                class="xor-display"
                role="region"
+               tabindex="0"
                aria-label="XOR operation visualization"></div>
         </section>
 
@@ -755,7 +778,7 @@
               <strong>Requires:</strong> Constant-time MAC comparison.
               Timing differences in comparison can still leak information.
             </p>
-            <div class="defense-flow" aria-label="Encrypt-then-MAC flow">
+            <div class="defense-flow" role="group" aria-label="Encrypt-then-MAC flow">
               <span class="flow-step">Encrypt (CBC)</span>
               <span class="flow-arrow" aria-hidden="true">→</span>
               <span class="flow-step">MAC(ciphertext)</span>
@@ -784,7 +807,7 @@
                    aria-labelledby="defense-aead-title">
             <h3 id="defense-aead-title" class="defense-card__title">
               Defense 3: Use AEAD — The Definitive Fix
-              <span class="badge badge--recommended" aria-label="Recommended approach">Recommended</span>
+              <span class="badge badge--recommended">Recommended</span>
             </h3>
             <p>
               AEAD (Authenticated Encryption with Associated Data) integrates encryption and
@@ -792,7 +815,7 @@
               authentication tag <em>before</em> any decryption. No padding is used (stream mode).
               No oracle is possible because no information is revealed on failure.
             </p>
-            <div class="defense-flow" aria-label="AEAD decryption flow">
+            <div class="defense-flow" role="group" aria-label="AEAD decryption flow">
               <span class="flow-step flow-step--verify">Check auth tag (first!)</span>
               <span class="flow-arrow" aria-hidden="true">→</span>
               <span class="flow-step flow-step--reject">Reject if invalid</span>
@@ -829,7 +852,7 @@
             Not run yet.
           </div>
 
-          <div class="comparison-table-wrapper" role="region" aria-label="Attack outcome per server mode">
+          <div class="comparison-table-wrapper" role="region" tabindex="0" aria-label="Attack outcome per server mode">
             <table class="comparison-table" aria-label="Attack outcome by server mode">
               <thead>
                 <tr>
@@ -901,7 +924,7 @@
         <!-- Decision guide -->
         <section class="panel-section" aria-labelledby="p6-guide-heading">
           <h3 id="p6-guide-heading" class="section-title">Decision Guide: CBC+MAC vs AEAD</h3>
-          <div class="comparison-table-wrapper" role="region" aria-label="CBC+MAC vs AEAD comparison">
+          <div class="comparison-table-wrapper" role="region" tabindex="0" aria-label="CBC+MAC vs AEAD comparison">
             <table class="comparison-table" aria-label="When to use CBC+MAC versus AEAD">
               <thead>
                 <tr>

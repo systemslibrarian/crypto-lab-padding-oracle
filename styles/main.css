@@ -133,7 +133,13 @@ body {
   color: var(--color-text);
   background-color: var(--color-bg);
   min-width: 320px;
-  overflow-x: hidden;
+  /* No `overflow-x: hidden` here. `overflow` on <body> propagates to the
+     viewport, so it does not make content fit — it CLIPS whatever does not, and
+     clipped content is unreachable rather than merely awkward. Under WCAG 1.4.10
+     that is the worse of the two outcomes. It also silences every reflow check:
+     with it set, `documentElement.scrollWidth === clientWidth` no matter how
+     wide the content really is, which is why the old gate could not have failed
+     on reflow even if it had looked. The e2e gate asserts it stays absent. */
 }
 
 /* ─── Accessibility utilities ────────────────────────────────────── */
@@ -280,7 +286,14 @@ a:hover { text-decoration: none; }
   flex-shrink: 0;
   background: var(--color-surface);
   color: var(--color-text-2);
-  border: 1px solid var(--color-border);
+  /* --color-control-border, not --color-border. An unselected tab's fill is
+     within 1.1:1 of the sticky bar behind it, so the border is the only thing
+     that delineates it, and --color-border measured 1.41:1 dark / 1.27:1 light
+     against --color-bg-2 — under the 3:1 SC 1.4.11 asks of a control boundary.
+     --color-control-border measures 4.07:1 dark / 3.40:1 light on the same
+     surface. (--color-border stays right for surface dividers, which have no
+     such floor.) */
+  border: 1px solid var(--color-control-border);
   border-bottom: none;
   border-radius: var(--radius-md) var(--radius-md) 0 0;
   padding: var(--space-2) var(--space-4);
@@ -415,7 +428,13 @@ a:hover { text-decoration: none; }
 .btn--stop {
   background: transparent;
   color: var(--color-text-2);
-  border-color: var(--color-border);
+  /* This is the only button on the page with NO fill, so its border is the whole
+     control boundary. --color-border is a surface divider and measured 1.26:1
+     dark / 1.18:1 light against the panel behind it — well under the 3:1 of SC
+     1.4.11, and the button is only ever on screen while an attack is running,
+     which is exactly when a reader needs to find it. --color-control-border
+     measures 3.25:1 dark / 3.19:1 light on --color-bg-3. */
+  border-color: var(--color-control-border);
 }
 .btn--stop:hover:not(:disabled) {
   border-color: var(--color-text-2);
@@ -593,6 +612,15 @@ a:hover { text-decoration: none; }
 
 .byte-cell {
   aspect-ratio: 1;
+  /* Positioned so the `.byte-cell__state-label` inside it — an absolutely
+     positioned `.sr-only` span — takes THIS box as its containing block. Left
+     static, the span's containing block was the initial one, which meant the
+     `overflow-x: auto` on `.byte-grid` did not clip it: an absolutely positioned
+     box is only clipped by an ancestor that is in its containing-block chain. At
+     380px the sixteenth cell's label sat at x=438 and pushed the DOCUMENT's
+     scroll width to 439 against a 380px viewport — a WCAG 1.4.10 reflow failure
+     produced entirely by a 1x1 screen-reader-only span. */
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -899,24 +927,33 @@ a:hover { text-decoration: none; }
 }
 
 /* ─── Two-column layout ──────────────────────────────────────────── */
+/* minmax(0, 1fr), not 1fr. A bare `1fr` track takes its AUTOMATIC MINIMUM from
+   the min-content width of its item, and these items wrap `.byte-grid-row`,
+   which is `min-width: 416px`. The `overflow-x: auto` that is supposed to absorb
+   that sits on `.byte-grid`, a GRANDCHILD — and an overflow scroller only zeroes
+   the automatic minimum when the scroller IS the grid item. So at 380px the
+   single-column track expanded to 416px and pushed the whole document to a
+   449px scroll width: a WCAG 1.4.10 failure whose cause was three levels away
+   from anything a reflow report would name. minmax(0, …) lets the track shrink
+   and hands the overflow back to the scroller that was built for it. */
 .two-col {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
   margin-bottom: var(--space-6);
 }
 @media (min-width: 640px) {
-  .two-col { grid-template-columns: 1fr 1fr; }
+  .two-col { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 }
 
 .two-grids {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-6);
   margin-bottom: var(--space-6);
 }
 @media (min-width: 640px) {
-  .two-grids { grid-template-columns: 1fr 1fr; }
+  .two-grids { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 }
 
 /* ─── Step flow ──────────────────────────────────────────────────── */

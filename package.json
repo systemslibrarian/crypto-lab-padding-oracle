@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "type-check": "tsc --noEmit",
+    "type-check": "tsc --noEmit && tsc --noEmit -p e2e/tsconfig.json",
     "test": "node --test",
     "build": "tsc && vite build",
     "preview": "vite preview",
@@ -32,6 +32,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",
     "@playwright/test": "^1.61.1",
+    "@types/node": "^26.2.0",
     "gh-pages": "^6.3.0",
     "typescript": "^6.0.2",
     "vite": "^8.0.7"
