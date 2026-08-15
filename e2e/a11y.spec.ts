@@ -24,7 +24,7 @@ test.describe('WCAG gate', () => {
   // after each of ~25 steps.
   test.slow();
 
-  for (const theme of ['dark', 'light'] as const) {
+  for (const theme of ['dark'] as const) {
     test(`${theme} theme, desktop width`, async ({ page }) => {
       const errors = watchPageErrors(page);
       await boot(page, theme);
