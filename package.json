@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "type-check": "tsc --noEmit && tsc --noEmit -p e2e/tsconfig.json",
-    "test": "node --test",
+    "test": "node --test --test-timeout=60000",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test:a11y": "playwright test",
