@@ -25,7 +25,10 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          # 24, not 20: the unit tests are TypeScript run by Node's own type
+          # stripping. Node 20 has none, so `node --test` found no test files and
+          # the gate passed on "# tests 0". scripts/test.mjs now fails on that.
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
