@@ -56,6 +56,10 @@ test('Panel 3 recovers the block the learner typed', async ({ page }) => {
   await expect(result).toContainText('RENDEZVOUS 0400!');
   await expect(result).toContainText('byte-for-byte match');
   await expect(result).not.toContainText('MISMATCH');
+  // Assert the rendered byte itself, not just the page's own match badge.
+  // The first byte of the chosen block is ASCII R = 0x52; the last is ! = 0x21.
+  await expect(page.locator('#p3-byte-grid [data-index="0"]')).toHaveAttribute('aria-label', 'Byte 1: plaintext 0x52');
+  await expect(page.locator('#p3-byte-grid [data-index="15"]')).toHaveAttribute('aria-label', 'Byte 16: plaintext 0x21');
   await expect(page.locator('#p3-query-count')).not.toHaveText('0');
 });
 
