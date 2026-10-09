@@ -7,10 +7,11 @@
     "dev": "vite",
     "type-check": "tsc --noEmit && tsc --noEmit -p e2e/tsconfig.json",
     "test": "node scripts/test.mjs",
-    "build": "tsc && vite build",
+    "build": "npm run test:publish-request && tsc && vite build",
     "preview": "vite preview",
     "test:a11y": "playwright test",
-    "deploy": "vite build && gh-pages -d dist"
+    "deploy": "gh workflow run pages.yml --repo systemslibrarian/crypto-lab-padding-oracle --ref main",
+    "test:publish-request": "node --test tests/publish-request.node.mjs"
   },
   "repository": {
     "type": "git",
@@ -33,7 +34,6 @@
     "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.63.0",
     "@types/node": "^26.6.4",
-    "gh-pages": "^6.3.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.2"
   }
