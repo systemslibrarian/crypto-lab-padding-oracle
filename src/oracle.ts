@@ -158,6 +158,9 @@ export async function queryOracle(
   prevBlock: Uint8Array,
   targetBlock: Uint8Array
 ): Promise<OracleResult> {
+  if (prevBlock.length !== BLOCK_SIZE || targetBlock.length !== BLOCK_SIZE) {
+    throw new RangeError(`Oracle queries require two ${BLOCK_SIZE}-byte blocks`);
+  }
   session.queryCount++;
 
   // Encrypt-then-MAC: verify the tag over the submitted ciphertext FIRST. A
@@ -260,6 +263,9 @@ export async function encryptWithSession(
  * Split a ciphertext buffer into 16-byte blocks.
  */
 export function splitBlocks(data: Uint8Array): Uint8Array[] {
+  if (data.length % BLOCK_SIZE !== 0) {
+    throw new RangeError(`Ciphertext length must be a multiple of ${BLOCK_SIZE} bytes`);
+  }
   const blocks: Uint8Array[] = [];
   for (let i = 0; i < data.length; i += BLOCK_SIZE) {
     blocks.push(data.slice(i, i + BLOCK_SIZE));
@@ -271,6 +277,9 @@ export function splitBlocks(data: Uint8Array): Uint8Array[] {
  * XOR two equal-length byte arrays.
  */
 export function xorBytes(a: Uint8Array, b: Uint8Array): Uint8Array {
+  if (a.length !== b.length) {
+    throw new RangeError('XOR inputs must have equal length');
+  }
   const result = new Uint8Array(a.length);
   for (let i = 0; i < a.length; i++) {
     result[i] = a[i] ^ b[i];
@@ -292,7 +301,9 @@ export function toHex(data: Uint8Array): string {
  */
 export function fromHex(hex: string): Uint8Array {
   const cleaned = hex.replace(/\s+/g, '');
-  if (cleaned.length % 2 !== 0) throw new Error('Invalid hex string');
+  if (cleaned.length % 2 !== 0 || !/^[0-9a-f]*$/i.test(cleaned)) {
+    throw new Error('Invalid hex string');
+  }
   const bytes = new Uint8Array(cleaned.length / 2);
   for (let i = 0; i < bytes.length; i++) {
     bytes[i] = parseInt(cleaned.slice(i * 2, i * 2 + 2), 16);

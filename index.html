@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="description" content="Interactive browser-based demonstration of the CBC padding oracle attack — decrypt any AES-CBC ciphertext without the key using only a padding validity oracle." />
+  <meta name="description" content="Interactive CBC padding-oracle demonstration: recover ciphertext protected by the oracle's AES-CBC key using only observable padding validity." />
   <meta name="color-scheme" content="dark light" />
   <meta name="theme-color" content="#0f1117" media="(prefers-color-scheme: dark)" />
   <meta name="theme-color" content="#f0f4ff" media="(prefers-color-scheme: light)" />
@@ -20,7 +20,7 @@
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Crypto Lab" />
   <meta property="og:title" content="CBC Padding Oracle Attack — Interactive Demo" />
-  <meta property="og:description" content="Decrypt any AES-CBC ciphertext without the key using only a one-bit padding validity oracle. Real WebCrypto, live byte-by-byte recovery, and an AES-GCM defense panel." />
+  <meta property="og:description" content="Recover AES-CBC ciphertext accepted by a matching one-bit padding oracle. Real WebCrypto, live byte-by-byte recovery, and authenticated-encryption defenses." />
   <meta property="og:url" content="https://systemslibrarian.github.io/crypto-lab-padding-oracle/" />
   <meta property="og:image" content="https://systemslibrarian.github.io/crypto-lab-padding-oracle/og-card.svg" />
   <meta property="og:image:type" content="image/svg+xml" />
@@ -31,7 +31,7 @@
   <!-- Twitter / X -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="CBC Padding Oracle Attack — Interactive Demo" />
-  <meta name="twitter:description" content="Decrypt any AES-CBC ciphertext without the key using only a one-bit padding validity oracle. Real WebCrypto, live recovery, AES-GCM defense." />
+  <meta name="twitter:description" content="Recover AES-CBC ciphertext accepted by a matching one-bit padding oracle. Real WebCrypto, live recovery, and authenticated-encryption defenses." />
   <meta name="twitter:image" content="https://systemslibrarian.github.io/crypto-lab-padding-oracle/og-card.svg" />
 
   <script type="application/ld+json">
@@ -39,7 +39,7 @@
     "@context": "https://schema.org",
     "@type": "LearningResource",
     "name": "CBC Padding Oracle Attack — Interactive Demo",
-    "description": "Browser-based interactive demonstration of the CBC padding oracle attack (Vaudenay 2002): decrypt any AES-CBC ciphertext without the key using only a one-bit padding validity oracle.",
+    "description": "Browser-based interactive demonstration of the CBC padding oracle attack (Vaudenay 2002): recover ciphertext accepted under the oracle's AES-CBC key using only observable padding validity.",
     "url": "https://systemslibrarian.github.io/crypto-lab-padding-oracle/",
     "learningResourceType": "interactive simulation",
     "educationalLevel": "advanced",
@@ -199,11 +199,11 @@
     <div class="cl-hero-main">
       <h1 class="cl-hero-title">Padding Oracle</h1>
       <p class="cl-hero-sub">AES-CBC · PKCS#7 · Vaudenay 2002</p>
-      <p class="cl-hero-desc">Recover an AES-CBC plaintext byte by byte from a single valid/invalid padding oracle — no key required — then watch AES-GCM shut the whole attack down.</p>
+      <p class="cl-hero-desc">Recover AES-CBC plaintext byte by byte when a matching valid/invalid padding oracle is exposed — no key recovery required — then watch authenticated decryption shut the oracle down.</p>
     </div>
     <aside class="cl-hero-why" aria-label="Why it matters">
       <span class="cl-hero-why-label">WHY IT MATTERS</span>
-      <p class="cl-hero-why-text">The same one-bit leak has broken TLS, ASP.NET, IPsec, and JavaServer Faces in the wild. It shows why unauthenticated CBC is exploitable in practice, and why authenticated encryption (AEAD) is now the non-negotiable default.</p>
+      <p class="cl-hero-why-text">Padding oracles have affected deployed systems including TLS and ASP.NET. They show why ciphertext must be authenticated before padded CBC is decrypted, and why AEAD is the default for new designs.</p>
     </aside>
   </header>
 
@@ -218,7 +218,7 @@
       <button class="panel-tab" role="tab" aria-selected="false" tabindex="-1"
               aria-controls="panel-2" id="tab-2">
         <span class="panel-tab__num" aria-hidden="true">2</span>
-        <span class="panel-tab__label">Single Byte</span>
+        <span class="panel-tab__label">Byte-by-Byte</span>
       </button>
       <button class="panel-tab" role="tab" aria-selected="false" tabindex="-1"
               aria-controls="panel-3" id="tab-3">
@@ -269,7 +269,7 @@
                under `incomplete`, never under `violations`. -->
           <div id="p1-cbc-diagram" class="diagram-container" role="group" tabindex="0" aria-label="CBC decryption diagram"></div>
           <p class="panel-note" role="note">
-            The padding check at the end is the oracle. An HTTP 200 vs 500, a TLS alert code,
+            The padding check at the end is the oracle. Distinct HTTP responses, a TLS alert code,
             or even a measurable timing difference — all are sufficient to mount the full attack.
           </p>
         </section>
@@ -306,21 +306,21 @@
           <div class="oracle-examples" role="group" aria-label="Real-world oracle examples">
             <div class="oracle-example" role="group" aria-label="HTTP oracle example">
               <span class="oracle-example__label">HTTP</span>
-              <span class="badge badge--valid">HTTP 200 = Valid</span>
+              <span class="badge badge--valid">Response A = Valid</span>
               <span class="oracle-example__sep" aria-hidden="true">vs</span>
-              <span class="badge badge--invalid">HTTP 500 = Invalid</span>
+              <span class="badge badge--invalid">Response B = Invalid</span>
             </div>
             <div class="oracle-example" role="group" aria-label="TLS oracle example">
               <span class="oracle-example__label">TLS</span>
-              <span class="badge badge--valid">Handshake Alert = Valid</span>
+              <span class="badge badge--valid">Padding path observable</span>
               <span class="oracle-example__sep" aria-hidden="true">vs</span>
-              <span class="badge badge--invalid">Bad Record MAC = Invalid</span>
+              <span class="badge badge--invalid">Other error path observable</span>
             </div>
             <div class="oracle-example" role="group" aria-label="Timing oracle example">
               <span class="oracle-example__label">Timing</span>
-              <span class="badge badge--valid">Faster response = Valid</span>
+              <span class="badge badge--valid">Timing cluster A</span>
               <span class="oracle-example__sep" aria-hidden="true">vs</span>
-              <span class="badge badge--invalid">Slower response = Invalid</span>
+              <span class="badge badge--invalid">Timing cluster B</span>
             </div>
           </div>
           <p class="panel-note" role="note">
@@ -400,7 +400,7 @@
     <!-- ─────────────────────────────────────────────── PANEL 2 -->
     <section class="panel" id="panel-2" role="tabpanel" aria-labelledby="tab-2" hidden>
       <div class="panel__inner">
-        <h2 class="panel__title">Single Byte Recovery — The Core Attack</h2>
+        <h2 class="panel__title">Byte-by-Byte Recovery — The Core Attack</h2>
         <p class="panel__intro">
           The padding oracle attack recovers one plaintext byte at a time.
           Starting with the last byte: probe all 256 values of C[n−1][15] until
@@ -444,7 +444,7 @@
                    aria-label="Plaintext to encrypt and then attack"
                    aria-describedby="p2-plaintext-hint" />
             <span id="p2-plaintext-hint" class="hint">
-              Any text — will be AES-CBC encrypted with a random key.
+              Up to 200 UTF-8 bytes — encrypted with a random AES-CBC key.
             </span>
           </div>
 
@@ -463,7 +463,7 @@
               Encrypt
             </button>
             <button id="p2-run-btn" type="button" class="btn btn--attack" disabled
-                    aria-label="Run single byte recovery attack">
+                    aria-label="Run byte-by-byte recovery attack">
               Run Attack
             </button>
             <button id="p2-stop-btn" type="button" class="btn btn--stop" disabled
@@ -538,22 +538,22 @@
           Extend single-byte recovery across all 16 bytes. For byte at position <em>j</em>
           (counting from right), set up padding <code>0x(16−j)</code> by fixing up already-recovered
           bytes: <code>C[n−1]′[k] = I[k] ⊕ padByte</code> for all known <em>k > j</em>.
-          Total: ~<strong>O(256 × 16) = 4096 oracle calls</strong> per block (worst case).
+          This implementation needs at most <strong>4,098 oracle calls</strong> per block:
+          4,096 primary probes plus up to two last-byte disambiguation checks.
         </p>
 
         <section class="panel-section" aria-labelledby="p3-controls-heading">
           <h3 id="p3-controls-heading" class="section-title">Live Block Recovery</h3>
 
           <div class="info-box" role="note" aria-label="Target block note">
-            The attack recovers <strong>block 0</strong> — the first 16 bytes of whatever you type.
-            Shorter messages are padded by PKCS#7 to fill the block; longer ones keep the rest of
-            their text in later blocks (Panel 4 recovers all of them).
+            Enter at most one 16-byte block. Shorter messages are padded by PKCS#7;
+            Panel 4 demonstrates bounded multi-block recovery.
           </div>
 
           <div class="control-row">
             <label for="p3-plaintext" class="control-label">Target plaintext:</label>
             <input id="p3-plaintext" type="text" class="text-input" value="Attack at dawn!!"
-                   maxlength="64" aria-describedby="p3-bytecount"
+                   maxlength="16" aria-describedby="p3-bytecount"
                    aria-label="Plaintext to encrypt and then recover" />
             <span id="p3-bytecount" class="control-hint">16 bytes</span>
           </div>
@@ -647,11 +647,11 @@
             <textarea id="p4-plaintext"
                       class="text-input text-input--area"
                       rows="3"
-                      maxlength="500"
+                      maxlength="128"
                       aria-label="Plaintext to encrypt then attack"
                       aria-describedby="p4-plaintext-hint">The quick brown fox jumps over the lazy dog. Secrets hidden in CBC ciphertext.</textarea>
             <span id="p4-plaintext-hint" class="hint">
-              Multiple blocks recommended — see total query count grow.
+              Up to 128 UTF-8 bytes; multiple blocks show how query cost grows.
             </span>
           </div>
 
@@ -711,8 +711,8 @@
 
         <div class="info-box info-box--note" role="note" aria-label="IV note">
           <strong>Note on Block 0:</strong> Recovering block 0 requires the IV.
-          In most real attacks, the IV is transmitted alongside the ciphertext (TLS record header,
-          HTTP response) — making full recovery possible. If the IV is secret, only blocks 1–n
+          In many protocols, the IV is transmitted or derived alongside the ciphertext,
+          making full recovery possible. If the IV is unavailable, only blocks 1–n
           are recoverable from the ciphertext alone.
         </div>
       </div>
@@ -723,8 +723,8 @@
       <div class="panel__inner">
         <h2 class="panel__title">Real-World Exploits Hall of Fame</h2>
         <p class="panel__intro">
-          The padding oracle attack is not theoretical. It has broken production systems
-          serving billions of users. These exploits share a common thread:
+          The padding oracle attack is not theoretical. It has affected production systems
+          and standardized protocols. These examples share a common thread:
           CBC mode + a padding oracle = full plaintext recovery.
         </p>
 
@@ -734,14 +734,14 @@
              aria-label="Real-world CBC padding oracle exploits"></div>
 
         <section class="panel-section" aria-labelledby="p5-tls13-heading">
-          <h3 id="p5-tls13-heading" class="section-title">Why TLS 1.3 Eliminated CBC</h3>
+          <h3 id="p5-tls13-heading" class="section-title">Why TLS 1.3 Has No CBC Suites</h3>
           <div class="info-box" role="note">
             <p>
-              TLS 1.3 (RFC 8446, 2018) removed all CBC cipher suites. Only AEAD cipher suites
-              are permitted: AES-GCM, AES-CCM, and ChaCha20-Poly1305. The reason is exactly
-              this attack: CBC with any padding oracle — whether explicit error responses or
-              timing side-channels — is fundamentally broken. AEAD ciphers authenticate before
-              decrypting, so no padding oracle can exist.
+              TLS 1.3's current specification,
+              <a href="https://www.rfc-editor.org/info/rfc9846/" target="_blank" rel="noopener noreferrer">RFC 9846 (2026)</a>,
+              obsoletes RFC 8446 and defines AEAD-based encrypted suites rather than CBC suites:
+              AES-GCM, AES-CCM, and ChaCha20-Poly1305. Authenticated record protection prevents
+              attacker-modified ciphertext from reaching an observable CBC padding branch.
             </p>
           </div>
         </section>
@@ -753,15 +753,16 @@
       <div class="panel__inner">
         <h2 class="panel__title">Defenses and Why AEAD Wins</h2>
         <p class="panel__intro">
-          There are several ways to stop the padding oracle attack. Only AEAD eliminates
-          the attack class entirely — the others reduce risk but require careful implementation.
+          Proper Encrypt-then-MAC and AEAD both stop ciphertext modification before padded
+          plaintext is processed. AEAD is preferred for new designs because it packages the
+          confidentiality and integrity requirements into one reviewed construction.
         </p>
 
         <div class="defenses-grid" role="list" aria-label="Defense options">
           <article class="defense-card" role="listitem" aria-labelledby="defense-etm-title">
             <h3 id="defense-etm-title" class="defense-card__title">Defense 1: Encrypt-then-MAC</h3>
             <p>
-              Compute a MAC over the <em>ciphertext</em> (not the plaintext).
+              Compute a MAC over the IV, ciphertext, and relevant context (not the plaintext alone).
               Verify the MAC before attempting decryption. If the MAC is invalid,
               reject immediately — no decryption, no padding, no oracle.
             </p>
@@ -788,9 +789,9 @@
               result only after examining the entire block.
             </p>
             <p class="defense-card__caveat" role="note">
-              <strong>Limitation:</strong> Eliminates timing oracle but not error-response oracles.
-              If the system still returns different error codes, the oracle remains.
-              Lucky Thirteen shows that even microsecond differences matter.
+              <strong>Limitation:</strong> This reduces one timing signal but is not a complete fix.
+              Later MAC processing, error paths, or downstream behavior can still reveal padding.
+              Lucky Thirteen shows that very small timing differences matter.
             </p>
           </article>
 
@@ -802,9 +803,9 @@
             </h3>
             <p>
               AEAD (Authenticated Encryption with Associated Data) integrates encryption and
-              authentication into a single primitive. AES-GCM and ChaCha20-Poly1305 check the
-              authentication tag <em>before</em> any decryption. No padding is used (stream mode).
-              No oracle is possible because no information is revealed on failure.
+              authentication into one construction. AES-GCM and ChaCha20-Poly1305 use no PKCS#7
+              padding, and their authenticated-decryption interface must not release plaintext
+              when tag verification fails. Uniform failures expose no CBC padding result to query.
             </p>
             <div class="defense-flow" role="group" aria-label="AEAD decryption flow">
               <span class="flow-step flow-step--verify">Check auth tag (first!)</span>
@@ -829,7 +830,9 @@
           <div class="control-row">
             <label for="p6-bench-plaintext" class="control-label">Plaintext to attack:</label>
             <input id="p6-bench-plaintext" type="text" class="text-input" value="Attack at dawn!!"
-                   maxlength="64" aria-label="Plaintext the three servers will protect" />
+                   maxlength="16" aria-label="Plaintext the three servers will protect"
+                   aria-describedby="p6-bench-hint" />
+            <span id="p6-bench-hint" class="hint">At most 16 UTF-8 bytes (one block).</span>
           </div>
 
           <div class="button-row">
@@ -908,7 +911,7 @@
               <li>Security architects designing cryptographically sound systems</li>
               <li>Anyone in a role where "we've always done it this way" is the threat model</li>
             </ul>
-            <p>The fix is always the same: <strong>use AEAD</strong>.</p>
+            <p>The invariant is always the same: <strong>authenticate ciphertext before processing padded plaintext</strong>; prefer AEAD for new designs.</p>
           </div>
         </section>
 
@@ -932,7 +935,7 @@
                 </tr>
                 <tr>
                   <td>Legacy protocol migration</td>
-                  <td class="cell--caution" aria-label="Use constant-time MAC as interim for legacy migration">Interim only — constant-time MAC required</td>
+                  <td class="cell--caution" aria-label="Authenticate ciphertext before decryption during legacy migration">Interim only — verify MAC first</td>
                   <td class="cell--yes" aria-label="Migrate to AEAD">✓ Target state</td>
                 </tr>
                 <tr>

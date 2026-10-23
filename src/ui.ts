@@ -35,6 +35,7 @@ import {
   renderXOROperation,
 } from './visualizer.ts';
 import { renderAllExploits } from './exploits.ts';
+import { boundedUtf8, DEMO_INPUT_LIMITS } from './input.ts';
 
 // ─── Announcement helper ─────────────────────────────────────────────────────
 
@@ -274,23 +275,42 @@ export function initPanel2(): void {
 
   if (!encryptBtn || !runBtn) return;
 
+  let inputRevision = 0;
+
+  plaintextInput?.addEventListener('input', () => {
+    inputRevision++;
+    p2Controller?.abort();
+    p2Controller = null;
+    p2Session = null;
+    runBtn.disabled = true;
+    stopBtn.disabled = true;
+    if (statusEl) statusEl.textContent = 'Plaintext changed — click "Encrypt" again.';
+  });
+
   encryptBtn.addEventListener('click', async () => {
     const text = plaintextInput?.value ?? 'Hello, padding oracle!';
+    const revision = inputRevision;
     // Do NOT pre-pad: createOracleSession passes data to WebCrypto encrypt which
     // applies PKCS#7 automatically. Pre-padding would create a spurious extra block.
-    const plaintext = toBytes(text);
 
     try {
       encryptBtn.disabled = true;
-      p2Session = await createOracleSession(plaintext);
+      p2Controller?.abort();
+      p2Controller = null;
+      p2Session = null;
+      runBtn.disabled = true;
+      const plaintext = boundedUtf8(text, DEMO_INPUT_LIMITS.lastBlock, 'Plaintext');
+      const session = await createOracleSession(plaintext);
+      if (revision !== inputRevision) return;
+      p2Session = session;
 
       if (ivDisplay) {
-        ivDisplay.textContent = toHex(p2Session.iv);
-        ivDisplay.setAttribute('aria-label', `IV: ${toHex(p2Session.iv)}`);
+        ivDisplay.textContent = toHex(session.iv);
+        ivDisplay.setAttribute('aria-label', `IV: ${toHex(session.iv)}`);
       }
       if (cipherDisplay) {
-        cipherDisplay.textContent = toHex(p2Session.ciphertext);
-        cipherDisplay.setAttribute('aria-label', `Ciphertext: ${toHex(p2Session.ciphertext)}`);
+        cipherDisplay.textContent = toHex(session.ciphertext);
+        cipherDisplay.setAttribute('aria-label', `Ciphertext: ${toHex(session.ciphertext)}`);
       }
 
       // A new session must not leave the PREVIOUS one's readouts on screen. The
@@ -299,7 +319,7 @@ export function initPanel2(): void {
       // green grid, a stale query total and the plaintext of a DIFFERENT
       // ciphertext — which a reader has every reason to read as belonging to the
       // session just created.
-      p2Session.queryCount = 0;
+      session.queryCount = 0;
       if (queryCountEl) queryCountEl.textContent = '0';
       if (resultEl) resultEl.innerHTML = '';
       if (byteGridEl) byteGridEl.innerHTML = '';
@@ -315,6 +335,8 @@ export function initPanel2(): void {
       announce('Encryption complete. Session ready.');
       runBtn.disabled = false;
     } catch (err) {
+      p2Session = null;
+      runBtn.disabled = true;
       if (statusEl) statusEl.textContent = `Error: ${String(err)}`;
     } finally {
       encryptBtn.disabled = false;
@@ -324,20 +346,22 @@ export function initPanel2(): void {
   runBtn.addEventListener('click', async () => {
     if (!p2Session) return;
 
-    const blocks = splitBlocks(p2Session.ciphertext);
+    const session = p2Session;
+    const controller = new AbortController();
+    p2Controller = controller;
+    const blocks = splitBlocks(session.ciphertext);
     if (blocks.length < 1) return;
 
-    p2Controller = new AbortController();
     runBtn.disabled = true;
     stopBtn.disabled = false;
     // Reset per-run state so a second run reports its own query count, not a
     // cumulative total, and doesn't show the previous run's result block.
-    p2Session.queryCount = 0;
+    session.queryCount = 0;
     if (resultEl) resultEl.innerHTML = '';
 
     // Attack the last block (index blocks.length-1), prev = blocks[length-2] or IV
     const targetIdx = blocks.length - 1;
-    const prevBlock = targetIdx === 0 ? p2Session.iv : blocks[targetIdx - 1];
+    const prevBlock = targetIdx === 0 ? session.iv : blocks[targetIdx - 1];
     const targetBlock = blocks[targetIdx];
 
     const grid = byteGridEl ? new BlockGrid(byteGridEl) : null;
@@ -354,7 +378,7 @@ export function initPanel2(): void {
 
     try {
       const { plaintext } = await recoverBlock(
-        p2Session,
+        session,
         prevBlock,
         targetBlock,
         targetIdx,
@@ -392,8 +416,12 @@ export function initPanel2(): void {
             await sleep(delay);
           }
         },
-        p2Controller.signal
+        controller.signal
       );
+
+      if (controller.signal.aborted || p2Session !== session) {
+        throw new DOMException('Attack aborted', 'AbortError');
+      }
 
       if (resultEl) {
         // When the input length is an exact multiple of 16, PKCS#7 appends a
@@ -437,19 +465,25 @@ export function initPanel2(): void {
       setP2Commentary(
         `<strong>Attack complete!</strong> The last block was fully decrypted in ` +
         `<strong>${(lastEvent as AttackEvent | null)?.queryCount ?? 0}</strong> oracle queries. ` +
-        `Each byte cost at most 256 queries to find (on average ~128). ` +
+        `Each primary byte scan cost at most 256 queries; the last byte also needed ` +
+        `a false-positive check. ` +
         `The AES key was never needed — only the oracle's valid/invalid response.`
       );
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
-        if (statusEl) statusEl.textContent = 'Attack stopped.';
-        announce('Attack stopped.');
-      } else {
+        if (p2Session === session) {
+          if (statusEl) statusEl.textContent = 'Attack stopped.';
+          announce('Attack stopped.');
+        }
+      } else if (p2Session === session) {
         if (statusEl) statusEl.textContent = `Error: ${String(err)}`;
       }
     } finally {
-      runBtn.disabled = false;
-      stopBtn.disabled = true;
+      if (p2Controller === controller) {
+        p2Controller = null;
+        runBtn.disabled = p2Session === null;
+        stopBtn.disabled = true;
+      }
     }
   });
 
@@ -488,35 +522,54 @@ export function initPanel3(): void {
 
   if (!encryptBtn || !runBtn) return;
 
+  let inputRevision = 0;
+
   // The learner types the block to be recovered. Block 0 is attacked, so the
   // first 16 bytes of whatever they enter are what comes back.
   function currentPlaintext(): string {
-    const value = plaintextInput?.value ?? '';
-    return value.length > 0 ? value : 'Attack at dawn!!';
+    return plaintextInput?.value ?? 'Attack at dawn!!';
   }
 
   function updateByteCount(): void {
     if (!byteCountEl) return;
     const len = toBytes(currentPlaintext()).length;
-    byteCountEl.textContent = len === BLOCK_SIZE
+    byteCountEl.textContent = len > DEMO_INPUT_LIMITS.oneBlock
+      ? `${len} bytes — limit is ${DEMO_INPUT_LIMITS.oneBlock}`
+      : len === BLOCK_SIZE
       ? '16 bytes — exactly one block'
-      : `${len} byte${len === 1 ? '' : 's'} — block 0 is the first ${Math.min(len, BLOCK_SIZE)}${len < BLOCK_SIZE ? ' plus PKCS#7 padding' : ''}`;
+      : `${len} byte${len === 1 ? '' : 's'} — PKCS#7 fills the rest of block 0`;
   }
 
   plaintextInput?.addEventListener('input', () => {
+    inputRevision++;
     updateByteCount();
     // A new target invalidates the session encrypted from the old one.
+    p3Controller?.abort();
+    p3Controller = null;
     p3Session = null;
     runBtn.disabled = true;
+    stopBtn.disabled = true;
     if (statusEl) statusEl.textContent = 'Plaintext changed — click "Encrypt Target Block" again.';
   });
   updateByteCount();
 
   encryptBtn.addEventListener('click', async () => {
     const targetPlaintext = currentPlaintext();
+    const revision = inputRevision;
     try {
       encryptBtn.disabled = true;
-      p3Session = await createOracleSession(toBytes(targetPlaintext));
+      p3Controller?.abort();
+      p3Controller = null;
+      p3Session = null;
+      runBtn.disabled = true;
+      const targetBytes = boundedUtf8(
+        targetPlaintext,
+        DEMO_INPUT_LIMITS.oneBlock,
+        'Target plaintext',
+      );
+      const session = await createOracleSession(targetBytes);
+      if (revision !== inputRevision) return;
+      p3Session = session;
 
       if (statusEl) statusEl.textContent = `Plaintext: "${targetPlaintext}" encrypted. Click "Run Full Block" to start.`;
       setP3Commentary(
@@ -529,6 +582,8 @@ export function initPanel3(): void {
       runBtn.disabled = false;
       if (resultEl) resultEl.innerHTML = '';
     } catch (err) {
+      p3Session = null;
+      runBtn.disabled = true;
       if (statusEl) statusEl.textContent = `Error: ${String(err)}`;
     } finally {
       encryptBtn.disabled = false;
@@ -538,16 +593,18 @@ export function initPanel3(): void {
   runBtn.addEventListener('click', async () => {
     if (!p3Session) return;
 
-    p3Controller = new AbortController();
+    const session = p3Session;
+    const controller = new AbortController();
+    p3Controller = controller;
     runBtn.disabled = true;
     stopBtn.disabled = false;
 
-    const blocks = splitBlocks(p3Session.ciphertext);
+    const blocks = splitBlocks(session.ciphertext);
     // Attack block 0 — that is where "Attack at dawn!!" lives.
     // Block-aligned plaintexts cause WebCrypto to append a full extra padding block;
     // targeting the last block would recover 0x10×16 (padding bytes), not plaintext.
     const targetIdx = 0;
-    const prevBlock = p3Session.iv; // prev block for block 0 is always the IV
+    const prevBlock = session.iv; // prev block for block 0 is always the IV
     const targetBlock = blocks[targetIdx];
 
     const grid = byteGridEl ? new BlockGrid(byteGridEl) : null;
@@ -555,14 +612,14 @@ export function initPanel3(): void {
     grid?.reset();
     interGrid?.reset();
 
-    p3Session.queryCount = 0;
+    session.queryCount = 0;
     const delay = parseInt(speedSelect?.value ?? '100');
 
     const intermediateArr = new Uint8Array(BLOCK_SIZE);
 
     try {
       const { plaintext, intermediate } = await recoverBlock(
-        p3Session,
+        session,
         prevBlock,
         targetBlock,
         targetIdx,
@@ -618,22 +675,34 @@ export function initPanel3(): void {
             await sleep(delay);
           }
         },
-        p3Controller.signal
+        controller.signal
       );
 
+      if (controller.signal.aborted || p3Session !== session) {
+        throw new DOMException('Attack aborted', 'AbortError');
+      }
+
       // Show result
-      const strippedPlain = stripPKCS7(plaintext) ?? plaintext;
+      // Only a short input puts PKCS#7 in block 0. A 16-byte input causes
+      // WebCrypto to append a separate full padding block, so stripping block 0
+      // would corrupt a legitimate suffix that merely resembles padding.
+      const strippedPlain = blocks.length === 1
+        ? (stripPKCS7(plaintext) ?? plaintext)
+        : plaintext;
 
       // Grade the recovery against block 0 of what was actually encrypted. The
       // attack path never reads session.plaintext, so this is the demo checking
       // itself rather than restating its own input.
-      const expectedBlock = applyPKCS7(p3Session.plaintext).slice(0, BLOCK_SIZE);
+      const expectedBlock = applyPKCS7(session.plaintext).slice(0, BLOCK_SIZE);
       const exactBlock =
         plaintext.length === expectedBlock.length &&
         plaintext.every((b, i) => b === expectedBlock[i]);
 
       if (resultEl) {
-        const theoretic = theoreticalQueryCount(p3Session.ciphertext.length);
+        // This panel attacks block 0 only. A 16-byte input causes WebCrypto to
+        // append a second, all-padding ciphertext block, but Panel 3 never
+        // queries it and must not double the displayed bound.
+        const theoretic = theoreticalQueryCount(BLOCK_SIZE);
         resultEl.innerHTML = `
           <div class="result-block">
             <div class="result-row"><span class="result-label">Recovered plaintext:</span>
@@ -641,10 +710,10 @@ export function initPanel3(): void {
             <div class="result-row"><span class="result-label">Checked against the encrypted block:</span>
               <span class="badge badge--${exactBlock ? 'valid' : 'invalid'}">${exactBlock ? 'byte-for-byte match' : 'MISMATCH — the attack did not recover this block'}</span></div>
             <div class="result-row"><span class="result-label">Oracle queries used:</span>
-              <span class="query-count">${p3Session.queryCount}</span></div>
-            <div class="result-row"><span class="result-label">Theoretical O(256×16×blocks) worst case:</span>
+              <span class="query-count">${session.queryCount}</span></div>
+            <div class="result-row"><span class="result-label">Exact implementation upper bound:</span>
               <span class="query-count">${theoretic.worstCase.toLocaleString()}</span></div>
-            <div class="result-row"><span class="result-label">Expected (~128×16×blocks):</span>
+            <div class="result-row"><span class="result-label">Nominal average (~2,057 per block):</span>
               <span class="query-count">${theoretic.expectedCase.toLocaleString()}</span></div>
             <div class="result-row"><span class="result-label">Intermediate values (hex):</span>
               <span class="hex-display">${toHex(intermediate)}</span></div>
@@ -655,15 +724,22 @@ export function initPanel3(): void {
       if (statusEl) statusEl.textContent = 'Full block recovered!';
       setP3Commentary(
         `<strong>Full block decrypted!</strong> "${escapeHtml(fromBytes(strippedPlain))}" — ` +
-        `recovered in <strong>${p3Session.queryCount}</strong> oracle queries. ` +
+        `recovered in <strong>${session.queryCount}</strong> oracle queries. ` +
         `The XOR table above shows how each intermediate byte I[j] XORed with C[n−1][j] ` +
         `yields the plaintext. The AES key was never used or needed.`
       );
-    } catch {
-      if (statusEl) statusEl.textContent = 'Attack stopped.';
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        if (p3Session === session && statusEl) statusEl.textContent = 'Attack stopped.';
+      } else if (p3Session === session && statusEl) {
+        statusEl.textContent = `Error: ${String(err)}`;
+      }
     } finally {
-      runBtn.disabled = false;
-      stopBtn.disabled = true;
+      if (p3Controller === controller) {
+        p3Controller = null;
+        runBtn.disabled = p3Session === null;
+        stopBtn.disabled = true;
+      }
     }
   });
 
@@ -699,31 +775,58 @@ export function initPanel4(): void {
 
   if (!generateBtn || !runBtn) return;
 
+  let inputRevision = 0;
+
+  plaintextInput?.addEventListener('input', () => {
+    inputRevision++;
+    p4Controller?.abort();
+    p4Controller = null;
+    p4Session = null;
+    runBtn.disabled = true;
+    stopBtn.disabled = true;
+    if (statusEl) statusEl.textContent = 'Plaintext changed — click "Generate Ciphertext" again.';
+  });
+
   generateBtn.addEventListener('click', async () => {
     const text = plaintextInput?.value ?? 'The quick brown fox jumps over the lazy dog. Secrets hidden in CBC ciphertext.';
+    const revision = inputRevision;
     try {
       generateBtn.disabled = true;
-      p4Session = await createOracleSession(toBytes(text));
+      p4Controller?.abort();
+      p4Controller = null;
+      p4Session = null;
+      runBtn.disabled = true;
+      const plaintext = boundedUtf8(
+        text,
+        DEMO_INPUT_LIMITS.fullCiphertext,
+        'Plaintext',
+      );
+      const session = await createOracleSession(plaintext);
+      if (revision !== inputRevision) return;
+      p4Session = session;
 
-      const cblocks = splitBlocks(p4Session.ciphertext);
+      const cblocks = splitBlocks(session.ciphertext);
       if (blockVizEl) {
-        renderCiphertextBlocks(blockVizEl, p4Session.iv, cblocks);
+        renderCiphertextBlocks(blockVizEl, session.iv, cblocks);
       }
 
       if (statusEl) {
-        const info = theoreticalQueryCount(p4Session.ciphertext.length);
+        const info = theoreticalQueryCount(session.ciphertext.length);
         statusEl.textContent = `${cblocks.length} block(s) encrypted. Worst-case queries: ${info.worstCase.toLocaleString()}. Click "Run Full Attack".`;
       }
       setP4Commentary(
         `<strong>${cblocks.length} ciphertext block${cblocks.length > 1 ? 's' : ''} ready.</strong> ` +
         `The attack will process each block in turn, recovering 16 plaintext bytes per block. ` +
-        `Each byte requires up to 256 oracle queries (expected ~128). ` +
+        `Each byte uses up to 256 primary probes; the last byte adds up to two ` +
+        `disambiguation checks per block. ` +
         `The IV is used to recover the first block — just as in a real-world attack where the IV travels with the ciphertext.`
       );
       announce('Ciphertext generated. Ready to attack.');
       runBtn.disabled = false;
       if (resultEl) resultEl.innerHTML = '';
     } catch (err) {
+      p4Session = null;
+      runBtn.disabled = true;
       if (statusEl) statusEl.textContent = `Error: ${String(err)}`;
     } finally {
       generateBtn.disabled = false;
@@ -733,13 +836,15 @@ export function initPanel4(): void {
   runBtn.addEventListener('click', async () => {
     if (!p4Session) return;
 
-    p4Controller = new AbortController();
+    const session = p4Session;
+    const controller = new AbortController();
+    p4Controller = controller;
     runBtn.disabled = true;
     stopBtn.disabled = false;
 
-    p4Session.queryCount = 0;
+    session.queryCount = 0;
     const delay = parseInt(speedSelect?.value ?? '0');
-    const cblocks = splitBlocks(p4Session.ciphertext);
+    const cblocks = splitBlocks(session.ciphertext);
     const totalBlocks = cblocks.length;
 
     if (progressBar) {
@@ -748,14 +853,14 @@ export function initPanel4(): void {
     }
 
     const blockEls = blockVizEl
-      ? renderCiphertextBlocks(blockVizEl, p4Session.iv, cblocks, 0)
+      ? renderCiphertextBlocks(blockVizEl, session.iv, cblocks, 0)
       : [];
 
     const recoveredParts: string[] = [];
 
     try {
       const result = await fullCiphertextAttack(
-        p4Session,
+        session,
         async (event: AttackEvent) => {
           if (queryCountEl) queryCountEl.textContent = String(event.queryCount);
 
@@ -787,8 +892,12 @@ export function initPanel4(): void {
             await sleep(delay);
           }
         },
-        p4Controller.signal
+        controller.signal
       );
+
+      if (controller.signal.aborted || p4Session !== session) {
+        throw new DOMException('Attack aborted', 'AbortError');
+      }
 
       const recoveredText = fromBytes(result.plaintext);
 
@@ -796,13 +905,13 @@ export function initPanel4(): void {
       // session actually encrypted. The attacker path never reads this — it is
       // the demo grading itself, so the "recovered" claim on screen is a result
       // and not an assertion the page could make even if the attack were broken.
-      const original = p4Session.plaintext;
+      const original = session.plaintext;
       const exact =
         result.plaintext.length === original.length &&
         result.plaintext.every((b, i) => b === original[i]);
 
       if (resultEl) {
-        const info = theoreticalQueryCount(p4Session.ciphertext.length);
+        const info = theoreticalQueryCount(session.ciphertext.length);
         resultEl.innerHTML = `
           <div class="result-block">
             <div class="result-row"><span class="result-label">Recovered plaintext:</span>
@@ -811,7 +920,7 @@ export function initPanel4(): void {
               <span class="badge badge--${exact ? 'valid' : 'invalid'}">${exact ? 'byte-for-byte match' : 'MISMATCH — the attack did not fully recover it'}</span></div>
             <div class="result-row"><span class="result-label">Total oracle queries:</span>
               <span class="query-count">${result.queryCount.toLocaleString()}</span></div>
-            <div class="result-row"><span class="result-label">Theoretical O(256×16×${totalBlocks}) worst case:</span>
+            <div class="result-row"><span class="result-label">Exact upper bound for ${totalBlocks} block${totalBlocks === 1 ? '' : 's'}:</span>
               <span class="query-count">${info.worstCase.toLocaleString()}</span></div>
             <div class="result-row"><span class="result-label">Blocks decrypted:</span>
               <span class="query-count">${totalBlocks}</span></div>
@@ -822,11 +931,18 @@ export function initPanel4(): void {
         `Full decryption complete. Recovered: ${recoveredText}. ` +
         (exact ? 'Byte-for-byte match with the original plaintext.' : 'It does NOT match the original plaintext.')
       );
-    } catch {
-      if (statusEl) statusEl.textContent = 'Attack stopped.';
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        if (p4Session === session && statusEl) statusEl.textContent = 'Attack stopped.';
+      } else if (p4Session === session && statusEl) {
+        statusEl.textContent = `Error: ${String(err)}`;
+      }
     } finally {
-      runBtn.disabled = false;
-      stopBtn.disabled = true;
+      if (p4Controller === controller) {
+        p4Controller = null;
+        runBtn.disabled = p4Session === null;
+        stopBtn.disabled = true;
+      }
     }
   });
 
@@ -932,14 +1048,14 @@ async function initAEADDemo(): Promise<void> {
               <strong>Tampered ciphertext REJECTED by authentication tag.</strong>
             </p>
             <p>
-              AES-GCM checks the authentication tag <em>before</em> any decryption.
-              If the tag fails, no plaintext is ever produced — there is no oracle.
-              No information about the plaintext is revealed. No padding oracle attack is possible.
+              WebCrypto's authenticated-decryption operation returns plaintext only when the
+              authentication tag verifies. If the tag fails, this operation produces no plaintext
+              and exposes no padding result, so this CBC padding-oracle attack has nothing to query.
             </p>
             <p>
               Byte 0 was flipped: <span class="hex-byte">${aeadCiphertext[0].toString(16).padStart(2,'0')}</span>
               → <span class="hex-byte hex-byte--error">${tampered[0].toString(16).padStart(2,'0')}</span>
-              — authentication failed immediately.
+              — authenticated decryption rejected the modified input.
             </p>
           </div>
         `;
@@ -971,8 +1087,11 @@ export async function initP1OracleDemo(): Promise<void> {
       // Query with valid prev block — should be valid
       const validResult = await queryOracle(session, prevBlock, targetBlock);
 
-      // Query with a zeroed prev block — very likely invalid
-      const invalidPrev = new Uint8Array(BLOCK_SIZE);
+      // The plaintext ends in 03 03 03. Flipping the penultimate padding byte
+      // while leaving the final 03 untouched guarantees invalid padding; a
+      // random/zero IV made this teaching result flaky about once per 256 runs.
+      const invalidPrev = prevBlock.slice();
+      invalidPrev[BLOCK_SIZE - 2] ^= 0x01;
       const invalidResult = await queryOracle(session, invalidPrev, targetBlock);
 
       resultEl.innerHTML = `
@@ -984,15 +1103,16 @@ export async function initP1OracleDemo(): Promise<void> {
             </span>
           </div>
           <div class="result-row">
-            <span class="result-label">Query 2 (zeroed C[n-1]):</span>
+            <span class="result-label">Query 2 (tampered C[n-1]):</span>
             <span class="badge badge--${invalidResult.valid ? 'valid' : 'invalid'}">
               ${invalidResult.valid ? 'Valid ✓' : 'Invalid ✗'}
             </span>
           </div>
           <p class="info-note" role="note">
-            The oracle reveals one bit. That bit, queried at most ${BLOCK_SIZE * 256} times per
-            block — about ${BLOCK_SIZE * 128} on average, since a 256-value scan finds the right
-            probe halfway through — is enough to decrypt everything, without knowing the key.
+            The oracle reveals one bit. A block needs at most 4,098 queries in this implementation:
+            4,096 primary probes plus up to two final-byte disambiguation checks. The nominal
+            average is about 2,057. That is enough to decrypt ciphertext protected by the same key,
+            without learning the key itself.
           </p>
         </div>
       `;
@@ -1155,17 +1275,25 @@ export function initDefenseBench(): void {
     if (statusEl) statusEl.textContent = 'Running the same attack against each server…';
 
     try {
+      const plaintext = boundedUtf8(
+        text,
+        DEMO_INPUT_LIMITS.defenseBench,
+        'Defense-bench plaintext',
+      );
       const modes: OracleMode[] = ['leaky', 'silent', 'etm'];
       const trials: DefenseTrial[] = [];
 
       for (const mode of modes) {
         // Same plaintext, same attack code — only the server's behaviour differs.
-        trials.push(await trialAgainstMode(toBytes(text), mode));
+        trials.push(await trialAgainstMode(plaintext, mode));
       }
 
       rowsEl.innerHTML = trials.map((trial) => {
+        const recoveredForDisplay = trial.recovered && plaintext.length < BLOCK_SIZE
+          ? (stripPKCS7(trial.recovered) ?? trial.recovered)
+          : trial.recovered;
         const outcome = trial.failure === null
-          ? `<span class="badge badge--invalid">plaintext recovered</span> "${escapeHtml(fromBytes(trial.recovered ? (stripPKCS7(trial.recovered) ?? trial.recovered) : new Uint8Array()))}"${trial.matchedPlaintext ? ' — byte-for-byte match' : ' — DID NOT match the encrypted block'}`
+          ? `<span class="badge badge--invalid">plaintext recovered</span> "${escapeHtml(fromBytes(recoveredForDisplay ?? new Uint8Array()))}"${trial.matchedPlaintext ? ' — byte-for-byte match' : ' — DID NOT match the encrypted block'}`
           : `<span class="badge badge--valid">attack failed</span> ${escapeHtml(trial.failure)} (${trial.bytesRecovered} of 16 bytes)`;
         return `
           <tr>
@@ -1211,6 +1339,13 @@ export function initDefenseBench(): void {
       }
     } catch (err) {
       if (statusEl) statusEl.textContent = `Error: ${String(err)}`;
+      rowsEl.innerHTML = '';
+      const row = document.createElement('tr');
+      const cell = document.createElement('td');
+      cell.colSpan = 5;
+      cell.textContent = `Not run: ${String(err)}`;
+      row.appendChild(cell);
+      rowsEl.appendChild(row);
     } finally {
       runBtn.disabled = false;
     }

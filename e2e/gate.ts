@@ -725,7 +725,7 @@ export async function driveAllStates(page: Page, theme: string): Promise<void> {
   await expect(page.locator('#p2-status')).toContainText('Attack complete', { timeout: 120_000 });
   await expect(page.locator('#p2-result')).not.toBeEmpty();
   await expect(page.locator('#p2-query-count')).not.toHaveText('0');
-  await scanAt('panel 2 single byte recovered, grid complete');
+  await scanAt('panel 2 last block recovered byte by byte, grid complete');
 
   // Re-encrypting resets the grid under a populated status line.
   await page.click('#p2-encrypt-btn');
