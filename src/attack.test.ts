@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 
 import { createOracleSession, encryptWithSession, fromBytes, stripPKCS7, toBytes, BLOCK_SIZE } from './oracle.ts';
 import type { OracleSession } from './oracle.ts';
-import { fullCiphertextAttack, recoverBlock } from './attack.ts';
+import { fullCiphertextAttack, recoverBlock, theoreticalQueryCount } from './attack.ts';
 import { splitBlocks } from './oracle.ts';
 
 const CASES: { name: string; text: string }[] = [
@@ -112,4 +112,18 @@ test('recoverBlock yields 16 intermediate + plaintext bytes', async () => {
   assert.equal(plaintext.length, BLOCK_SIZE);
   assert.equal(intermediate.length, BLOCK_SIZE);
   assert.equal(fromBytes(plaintext), 'Attack at dawn!!');
+});
+
+test('query estimates include final-byte disambiguation and reject partial blocks', () => {
+  assert.deepEqual(theoreticalQueryCount(BLOCK_SIZE), {
+    worstCase: 4098,
+    expectedCase: 2057,
+    blockCount: 1,
+  });
+  assert.deepEqual(theoreticalQueryCount(BLOCK_SIZE * 3), {
+    worstCase: 12_294,
+    expectedCase: 6171,
+    blockCount: 3,
+  });
+  assert.throws(() => theoreticalQueryCount(BLOCK_SIZE + 1), /multiple of 16/);
 });
