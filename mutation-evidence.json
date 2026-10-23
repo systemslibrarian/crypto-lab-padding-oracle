@@ -1,0 +1,92 @@
+[
+  {
+    "name": "query upper bound drops disambiguation",
+    "sourceDiff": "diff --git a/src/attack.ts b/src/attack.ts\nindex 0bf9cdb..641da2f 100644\n--- a/src/attack.ts\n+++ b/src/attack.ts\n@@ -383,7 +383,7 @@ export function theoreticalQueryCount(ciphertextLen: number): {\n   }\n   const blockCount = ciphertextLen / BLOCK_SIZE;\n   return {\n-    worstCase: (256 * BLOCK_SIZE + 2) * blockCount,\n+    worstCase: (256 * BLOCK_SIZE + 0) * blockCount,\n     expectedCase: Math.round((((256 + 1) / 2) * BLOCK_SIZE + 1) * blockCount),\n     blockCount,\n   };\n",
+    "baseline": "50838183076f57c44710d34a63eed78b59c1d51517030f101faec6e92f17387a",
+    "mutant": "1fade616e7d5924aead39b4fc7b4ab0d5ca7e303629660efdd8e56645d7ef22f",
+    "namedTest": "query estimates include final-byte disambiguation",
+    "assertionFailure": true,
+    "retries": 0,
+    "restoredGreen": true
+  },
+  {
+    "name": "malformed oracle query is counted",
+    "sourceDiff": "diff --git a/src/oracle.ts b/src/oracle.ts\nindex 17c2007..fd44e21 100644\n--- a/src/oracle.ts\n+++ b/src/oracle.ts\n@@ -158,7 +158,7 @@ export async function queryOracle(\n   prevBlock: Uint8Array,\n   targetBlock: Uint8Array\n ): Promise<OracleResult> {\n-  if (prevBlock.length !== BLOCK_SIZE || targetBlock.length !== BLOCK_SIZE) {\n+  if (false && (prevBlock.length !== BLOCK_SIZE || targetBlock.length !== BLOCK_SIZE)) {\n     throw new RangeError(`Oracle queries require two ${BLOCK_SIZE}-byte blocks`);\n   }\n   session.queryCount++;\n",
+    "baseline": "50838183076f57c44710d34a63eed78b59c1d51517030f101faec6e92f17387a",
+    "mutant": "f9ceb8ff8e664a87eee4ef2fa21cb87be71a1599025cfc19b24824db26772a3a",
+    "namedTest": "malformed oracle submissions are rejected",
+    "assertionFailure": true,
+    "retries": 0,
+    "restoredGreen": true
+  },
+  {
+    "name": "unequal XOR input silently truncates",
+    "sourceDiff": "diff --git a/src/oracle.ts b/src/oracle.ts\nindex 17c2007..bd8de8b 100644\n--- a/src/oracle.ts\n+++ b/src/oracle.ts\n@@ -277,7 +277,7 @@ export function splitBlocks(data: Uint8Array): Uint8Array[] {\n  * XOR two equal-length byte arrays.\n  */\n export function xorBytes(a: Uint8Array, b: Uint8Array): Uint8Array {\n-  if (a.length !== b.length) {\n+  if (false && a.length !== b.length) {\n     throw new RangeError('XOR inputs must have equal length');\n   }\n   const result = new Uint8Array(a.length);\n",
+    "baseline": "50838183076f57c44710d34a63eed78b59c1d51517030f101faec6e92f17387a",
+    "mutant": "7bef9ea380a7dbe83f4d25f43b828711ecf31707c4401ca0062da23a2c104d4c",
+    "namedTest": "block and XOR helpers reject malformed lengths",
+    "assertionFailure": true,
+    "retries": 0,
+    "restoredGreen": true
+  },
+  {
+    "name": "UTF-8 byte limit is bypassed",
+    "sourceDiff": "diff --git a/src/input.ts b/src/input.ts\nindex 9353bee..87f5e5c 100644\n--- a/src/input.ts\n+++ b/src/input.ts\n@@ -16,7 +16,7 @@ export function boundedUtf8(\n   label: string,\n ): Uint8Array {\n   const bytes = new TextEncoder().encode(text);\n-  if (bytes.length > maxBytes) {\n+  if (bytes.length < 0 && bytes.length > maxBytes) {\n     throw new RangeError(\n       `${label} must be at most ${maxBytes} UTF-8 bytes (received ${bytes.length})`,\n     );\n",
+    "baseline": "50838183076f57c44710d34a63eed78b59c1d51517030f101faec6e92f17387a",
+    "mutant": "0ddf0b84568584022002cc3808fb6460149b969f0e1a41f8806fb453be245393",
+    "namedTest": "demo input limits are enforced on UTF-8 bytes",
+    "assertionFailure": true,
+    "retries": 0,
+    "restoredGreen": true
+  },
+  {
+    "name": "live invalid oracle comparison is not tampered",
+    "sourceDiff": "diff --git a/src/ui.ts b/src/ui.ts\nindex e98fbad..744fd68 100644\n--- a/src/ui.ts\n+++ b/src/ui.ts\n@@ -1091,7 +1091,7 @@ export async function initP1OracleDemo(): Promise<void> {\n       // while leaving the final 03 untouched guarantees invalid padding; a\n       // random/zero IV made this teaching result flaky about once per 256 runs.\n       const invalidPrev = prevBlock.slice();\n-      invalidPrev[BLOCK_SIZE - 2] ^= 0x01;\n+      invalidPrev[BLOCK_SIZE - 2] ^= 0x00;\n       const invalidResult = await queryOracle(session, invalidPrev, targetBlock);\n \n       resultEl.innerHTML = `\n",
+    "baseline": "50838183076f57c44710d34a63eed78b59c1d51517030f101faec6e92f17387a",
+    "mutant": "c26ebd0e86cf1bd457a418f5369dad0e22891c8a1771965af787c2d87db3d065",
+    "namedTest": "Panel 1 live oracle comparison is deterministic",
+    "assertionFailure": true,
+    "retries": 0,
+    "restoredGreen": true
+  },
+  {
+    "name": "editing plaintext unlocks a stale session",
+    "sourceDiff": "diff --git a/src/ui.ts b/src/ui.ts\nindex e98fbad..0b475b1 100644\n--- a/src/ui.ts\n+++ b/src/ui.ts\n@@ -282,7 +282,7 @@ export function initPanel2(): void {\n     p2Controller?.abort();\n     p2Controller = null;\n     p2Session = null;\n-    runBtn.disabled = true;\n+    runBtn.disabled = false;\n     stopBtn.disabled = true;\n     if (statusEl) statusEl.textContent = 'Plaintext changed — click \"Encrypt\" again.';\n   });\n",
+    "baseline": "50838183076f57c44710d34a63eed78b59c1d51517030f101faec6e92f17387a",
+    "mutant": "21a0daa634ac4864ea4e99c1f413c2be6ee8665d64870b8b8cebd0e76ee64e68",
+    "namedTest": "UTF-8 workload limits and stale-session invalidation",
+    "assertionFailure": true,
+    "retries": 0,
+    "restoredGreen": true
+  },
+  {
+    "name": "block panel counts an unattacked padding block",
+    "sourceDiff": "diff --git a/src/ui.ts b/src/ui.ts\nindex e98fbad..cbdff57 100644\n--- a/src/ui.ts\n+++ b/src/ui.ts\n@@ -702,7 +702,7 @@ export function initPanel3(): void {\n         // This panel attacks block 0 only. A 16-byte input causes WebCrypto to\n         // append a second, all-padding ciphertext block, but Panel 3 never\n         // queries it and must not double the displayed bound.\n-        const theoretic = theoreticalQueryCount(BLOCK_SIZE);\n+        const theoretic = theoreticalQueryCount(session.ciphertext.length);\n         resultEl.innerHTML = `\n           <div class=\"result-block\">\n             <div class=\"result-row\"><span class=\"result-label\">Recovered plaintext:</span>\n",
+    "baseline": "50838183076f57c44710d34a63eed78b59c1d51517030f101faec6e92f17387a",
+    "mutant": "177bbff1dbe9c92dc10ce0c7f11c95001e218c969a027894231ee5be2cedfefd",
+    "namedTest": "Panel 3 recovers the block the learner typed",
+    "assertionFailure": true,
+    "retries": 0,
+    "restoredGreen": true
+  },
+  {
+    "name": "obsolete TLS publication restored",
+    "sourceDiff": "diff --git a/index.html b/index.html\nindex 9c71750..c768f7d 100644\n--- a/index.html\n+++ b/index.html\n@@ -738,7 +738,7 @@\n           <div class=\"info-box\" role=\"note\">\n             <p>\n               TLS 1.3's current specification,\n-              <a href=\"https://www.rfc-editor.org/info/rfc9846/\" target=\"_blank\" rel=\"noopener noreferrer\">RFC 9846 (2026)</a>,\n+              <a href=\"https://www.rfc-editor.org/info/rfc9846/\" target=\"_blank\" rel=\"noopener noreferrer\">RFC 8446 (2018)</a>,\n               obsoletes RFC 8446 and defines AEAD-based encrypted suites rather than CBC suites:\n               AES-GCM, AES-CCM, and ChaCha20-Poly1305. Authenticated record protection prevents\n               attacker-modified ciphertext from reaching an observable CBC padding branch.\n",
+    "baseline": "50838183076f57c44710d34a63eed78b59c1d51517030f101faec6e92f17387a",
+    "mutant": "23a06d8cac7a02b9a32fccb73859f550aa0a0b1bb1a28aa71b41ee8093e52636",
+    "namedTest": "current TLS and CBC remediation claims",
+    "assertionFailure": true,
+    "retries": 0,
+    "restoredGreen": true
+  },
+  {
+    "name": "constant-time padding is called complete",
+    "sourceDiff": "diff --git a/index.html b/index.html\nindex 9c71750..467d49f 100644\n--- a/index.html\n+++ b/index.html\n@@ -789,7 +789,7 @@\n               result only after examining the entire block.\n             </p>\n             <p class=\"defense-card__caveat\" role=\"note\">\n-              <strong>Limitation:</strong> This reduces one timing signal but is not a complete fix.\n+              <strong>Limitation:</strong> This reduces one timing signal and is a complete fix.\n               Later MAC processing, error paths, or downstream behavior can still reveal padding.\n               Lucky Thirteen shows that very small timing differences matter.\n             </p>\n",
+    "baseline": "50838183076f57c44710d34a63eed78b59c1d51517030f101faec6e92f17387a",
+    "mutant": "f73ba062e4c0a1163901cdfe86b9055567285520a72df0f67e63a1636d9936f3",
+    "namedTest": "current TLS and CBC remediation claims",
+    "assertionFailure": true,
+    "retries": 0,
+    "restoredGreen": true
+  }
+]
