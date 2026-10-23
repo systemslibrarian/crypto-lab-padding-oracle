@@ -537,7 +537,7 @@ export function initPanel3(): void {
       ? `${len} bytes — limit is ${DEMO_INPUT_LIMITS.oneBlock}`
       : len === BLOCK_SIZE
       ? '16 bytes — exactly one block'
-      : `${len} byte${len === 1 ? '' : 's'} — PKCS#7 fills the rest of block 0`;
+      : `${len} byte${len === 1 ? '' : 's'} — PKCS#7 padding fills the rest of block 0`;
   }
 
   plaintextInput?.addEventListener('input', () => {
