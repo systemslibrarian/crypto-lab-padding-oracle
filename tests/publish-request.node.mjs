@@ -8,7 +8,7 @@ import { fileURLToPath, URL } from 'node:url';
 import process from 'node:process';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const npmCli = join(process.execPath, '..', '..', 'lib', 'node_modules', 'npm', 'bin', 'npm-cli.js');
+const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
 // Replace only the external GitHub boundary; exercise the real npm script.
 // Neither control dispatches a workflow or uploads any local build.
@@ -18,7 +18,7 @@ function request(exitCode) {
   writeFileSync(gh, '#!/usr/bin/env node\nconsole.log(JSON.stringify(process.argv.slice(2)));\nprocess.exit(Number(process.env.PUBLISH_CONTROL_EXIT));\n');
   chmodSync(gh, 0o700);
   try {
-    return spawnSync(process.execPath, [npmCli, 'run', 'deploy', '--silent'], {
+    return spawnSync(npmCommand, ['run', 'deploy', '--silent'], {
       cwd: root,
       env: { ...process.env, PATH: dir + delimiter + process.env.PATH, GH_TOKEN: '', PUBLISH_CONTROL_EXIT: String(exitCode) },
       encoding: 'utf8',
@@ -32,7 +32,7 @@ function request(exitCode) {
 test('publishing requests the existing gated main workflow', () => {
   const result = request(0);
   assert.equal(result.error, undefined);
-  assert.equal(result.status, 0);
+  assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.deepEqual(JSON.parse(result.stdout.trim()), [
     'workflow', 'run', 'pages.yml', '--repo',
     'systemslibrarian/crypto-lab-padding-oracle', '--ref', 'main',
@@ -42,5 +42,5 @@ test('publishing requests the existing gated main workflow', () => {
 test('a rejected publishing request retains its failing exit status', () => {
   const result = request(73);
   assert.equal(result.error, undefined);
-  assert.equal(result.status, 73);
+  assert.equal(result.status, 73, result.stderr || result.stdout);
 });

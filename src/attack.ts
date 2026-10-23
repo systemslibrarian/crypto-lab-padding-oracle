@@ -16,8 +16,10 @@
  * Recovering I[j] does NOT require the key.
  *
  * Attack complexity: O(256 × block_size × block_count) oracle queries.
- * In practice, ~128 queries per byte on average (expected value of uniform
- * distribution over 0x00–0xFF), so ~2048 per block, ~2048n total for n blocks.
+ * A scan of uniformly positioned byte values averages 128.5 primary probes.
+ * The final byte also needs a disambiguation query, so the nominal average is
+ * about 2057 queries per block. Its exact upper bound is 4098: 4096 primary
+ * probes plus at most two final-byte disambiguation probes.
  *
  * No shortcuts. No simulated responses. All oracle calls use real WebCrypto.
  */
@@ -364,18 +366,25 @@ export async function trialAgainstMode(
 
 /**
  * Theoretical oracle query complexity for a given ciphertext length.
- * O(256 × block_size × block_count) — worst case.
- * Expected case: ~128 × block_size × block_count (avg 128 probes per byte).
+ * O(256 × block_size × block_count), including this implementation's
+ * final-byte false-positive disambiguation. There can be at most one multi-byte
+ * padding false positive before the genuine 0x01 candidate, so the exact upper
+ * bound is 4098 queries per block rather than 4096. A uniformly positioned
+ * correct guess averages 128.5 primary probes; adding the mandatory final-byte
+ * confirmation gives a nominal average of about 2057 queries per block.
  */
 export function theoreticalQueryCount(ciphertextLen: number): {
   worstCase: number;
   expectedCase: number;
   blockCount: number;
 } {
+  if (!Number.isSafeInteger(ciphertextLen) || ciphertextLen < 0 || ciphertextLen % BLOCK_SIZE !== 0) {
+    throw new RangeError(`Ciphertext length must be a non-negative multiple of ${BLOCK_SIZE}`);
+  }
   const blockCount = ciphertextLen / BLOCK_SIZE;
   return {
-    worstCase: 256 * BLOCK_SIZE * blockCount,
-    expectedCase: 128 * BLOCK_SIZE * blockCount,
+    worstCase: (256 * BLOCK_SIZE + 2) * blockCount,
+    expectedCase: Math.round((((256 + 1) / 2) * BLOCK_SIZE + 1) * blockCount),
     blockCount,
   };
 }

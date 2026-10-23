@@ -1196,6 +1196,7 @@ a:hover { text-decoration: none; }
   overflow: hidden;
 }
 .exploit-card--critical { border-top: 3px solid var(--color-invalid); }
+.exploit-card--important,
 .exploit-card--high     { border-top: 3px solid var(--color-warning); }
 .exploit-card--medium   { border-top: 3px solid var(--color-primary); }
 
@@ -1233,6 +1234,11 @@ a:hover { text-decoration: none; }
   border: 1px solid var(--color-invalid);
 }
 .exploit-card__severity--high {
+  background: var(--color-probing-bg);
+  color: var(--color-probing-text);
+  border: 1px solid var(--color-probing);
+}
+.exploit-card__severity--important {
   background: var(--color-probing-bg);
   color: var(--color-probing-text);
   border: 1px solid var(--color-probing);
