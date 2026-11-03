@@ -7,6 +7,8 @@
     "dev": "vite",
     "type-check": "tsc --noEmit && tsc --noEmit -p e2e/tsconfig.json",
     "test": "node scripts/test.mjs",
+    "test:workflow": "node --test scripts/workflow-controls.test.mjs",
+    "test:mutations": "node scripts/claim-mutations.mjs",
     "build": "npm run test:publish-request && tsc && vite build",
     "preview": "vite preview",
     "test:a11y": "playwright test",

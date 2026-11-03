@@ -15,6 +15,26 @@ async function openPanel(page: Page, index: number): Promise<void> {
   await expect(page.locator('.panel').nth(index)).toBeVisible();
 }
 
+async function setRawInput(page: Page, selector: string, value: string): Promise<void> {
+  await page.locator(selector).evaluate((element, next) => {
+    const input = element as HTMLInputElement | HTMLTextAreaElement;
+    input.value = next;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }, value);
+}
+
+test('Panel 1 live oracle comparison is deterministic', async ({ page }) => {
+  await page.goto('.');
+  await page.locator('#p1-oracle-demo-btn').click();
+
+  const rows = page.locator('#p1-oracle-demo-result .result-row');
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0)).toContainText('Valid');
+  await expect(rows.nth(1)).toContainText('Invalid');
+  await expect(rows.nth(1)).toContainText('tampered C[n-1]');
+  await expect(page.locator('#p1-oracle-demo-result')).toContainText('4,098');
+});
+
 test('Panel 2 recovers a block and reports a real query count', async ({ page }) => {
   await page.goto('.');
   await openPanel(page, 1);
@@ -30,11 +50,11 @@ test('Panel 2 recovers a block and reports a real query count', async ({ page })
   const result = page.locator('#p2-result');
   await expect(result).toContainText('Total oracle queries');
 
-  // The counter must be a real number of queries, not a placeholder. Each byte
-  // costs at most 256 probes and there are 16 of them.
+  // The counter must be real, not a placeholder. There are at most 4096
+  // primary probes plus two last-byte false-positive checks per block.
   const queries = Number((await page.locator('#p2-result .query-count').innerText()).replace(/[^\d]/g, ''));
   expect(queries).toBeGreaterThan(16);
-  expect(queries).toBeLessThanOrEqual(256 * 16 + 16);
+  expect(queries).toBeLessThanOrEqual(4098);
   expect(Number(await page.locator('#p2-query-count').innerText())).toBe(queries);
 });
 
@@ -56,6 +76,8 @@ test('Panel 3 recovers the block the learner typed', async ({ page }) => {
   await expect(result).toContainText('RENDEZVOUS 0400!');
   await expect(result).toContainText('byte-for-byte match');
   await expect(result).not.toContainText('MISMATCH');
+  await expect(result).toContainText('Exact implementation upper bound');
+  await expect(result).toContainText('4,098');
   // Assert the rendered byte itself, not just the page's own match badge.
   // The first byte of the chosen block is ASCII R = 0x52; the last is ! = 0x21.
   await expect(page.locator('#p3-byte-grid [data-index="0"]')).toHaveAttribute('aria-label', 'Byte 1: plaintext 0x52');
@@ -183,4 +205,54 @@ test('Panel 1 scores the learner padding prediction against a real oracle query'
   await expect(page.locator('#p1-craft-result')).toContainText('Valid ✓');
   await expect(page.locator('#p1-craft-result')).toContainText('Correct.');
   await expect(page.locator('#p1-craft-correct')).toHaveText('3');
+});
+
+test('UTF-8 workload limits and stale-session invalidation are enforced in code', async ({ page }) => {
+  await page.goto('.');
+  await openPanel(page, 1);
+
+  await page.locator('#p2-encrypt-btn').click();
+  await expect(page.locator('#p2-run-btn')).toBeEnabled();
+  await page.locator('#p2-plaintext').fill('changed after encryption');
+  await expect(page.locator('#p2-run-btn')).toBeDisabled();
+  await expect(page.locator('#p2-status')).toContainText('Plaintext changed');
+  await setRawInput(page, '#p2-plaintext', '🔐'.repeat(51));
+  await page.locator('#p2-encrypt-btn').click();
+  await expect(page.locator('#p2-status')).toContainText('at most 200 UTF-8 bytes (received 204)');
+  await expect(page.locator('#p2-run-btn')).toBeDisabled();
+
+  await openPanel(page, 2);
+  await setRawInput(page, '#p3-plaintext', '🔐'.repeat(5));
+  await page.locator('#p3-encrypt-btn').click();
+  await expect(page.locator('#p3-status')).toContainText('at most 16 UTF-8 bytes (received 20)');
+  await expect(page.locator('#p3-run-btn')).toBeDisabled();
+
+  await openPanel(page, 3);
+  await page.locator('#p4-generate-btn').click();
+  await expect(page.locator('#p4-run-btn')).toBeEnabled();
+  await page.locator('#p4-plaintext').fill('changed after generation');
+  await expect(page.locator('#p4-run-btn')).toBeDisabled();
+  await expect(page.locator('#p4-status')).toContainText('Plaintext changed');
+  await setRawInput(page, '#p4-plaintext', '🔐'.repeat(33));
+  await page.locator('#p4-generate-btn').click();
+  await expect(page.locator('#p4-status')).toContainText('at most 128 UTF-8 bytes (received 132)');
+  await expect(page.locator('#p4-run-btn')).toBeDisabled();
+
+  await openPanel(page, 5);
+  await setRawInput(page, '#p6-bench-plaintext', '🔐'.repeat(5));
+  await page.locator('#p6-bench-btn').click();
+  await expect(page.locator('#p6-bench-status')).toContainText('at most 16 UTF-8 bytes (received 20)');
+  await expect(page.locator('#p6-bench-rows')).toContainText('Not run');
+});
+
+test('current TLS and CBC remediation claims are rendered from verified publications', async ({ page }) => {
+  await page.goto('.');
+  await openPanel(page, 4);
+  await expect(page.locator('#panel-5')).toContainText('RFC 9846 (2026)');
+  await expect(page.locator('#panel-5')).toContainText('obsoletes RFC 8446');
+  await expect(page.locator('#exploit-title-aspnet-ms10-070').locator('..')).toContainText('Important');
+
+  await openPanel(page, 5);
+  await expect(page.locator('#panel-6')).toContainText('Proper Encrypt-then-MAC and AEAD both stop');
+  await expect(page.locator('#panel-6')).toContainText('not a complete fix');
 });
