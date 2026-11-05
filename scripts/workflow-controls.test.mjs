@@ -87,7 +87,15 @@ test('Dependabot automation is gated, version-limited, and fail-closed', () => {
   assert.match(merge, /update-type == 'version-update:semver-patch'/);
   assert.match(merge, /Leave major updates for human review/);
   assert.match(merge, /Reject an unrecognized Dependabot update type/);
-  assert.match(merge, /state="\$\(gh pr view/);
+  // The flag comes from the merge command's own exit status. It used to assert
+  // `state="$(gh pr view ...)"` here, which made MANDATORY the construct
+  // tools/transform.mjs removed from ~179 labs in this fleet: a second question
+  // about a merge that already happened, whose failure leaves the flag unset,
+  // fails all three attempts after a successful merge, and never reaches the
+  // dispatch below. Assert the shape dispatch-sync asserts, and forbid the
+  // second question outright.
+  assert.match(merge, /if gh pr merge --squash --delete-branch "\$PR_URL"; then\n\s+merged=true\n\s+break\n/);
+  assert.doesNotMatch(merge, /gh pr view/);
   assert.match(merge, /gh workflow run pages\.yml/);
   assert.match(merge, /::error::gate passed/);
   assert.match(merge, /::error::merge landed, but the required deploy workflow did not dispatch/);
