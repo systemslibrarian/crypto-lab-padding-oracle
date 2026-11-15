@@ -2,7 +2,7 @@
 
 ## What It Is
 
-`crypto-lab-padding-oracle` is a browser-based interactive demonstration of the **CBC padding oracle attack** (Vaudenay 2002) — a chosen-ciphertext attack that recovers CBC ciphertext accepted under the oracle's key without recovering that key, using only observable padding validity. All cryptographic operations use the browser's native WebCrypto API: real AES-128-CBC encryption with PKCS#7 padding, real AES-256-GCM for the AEAD defense demo, and real padding validation on queries that reach CBC decryption; the Encrypt-then-MAC server rejects modified ciphertext before that check. The attack exploits CBC combined with observable padding behavior, not a weakness in AES itself.
+`crypto-lab-padding-oracle` is a browser-based interactive demonstration of the **CBC padding oracle attack** (Vaudenay 2002) — a chosen-ciphertext attack that recovers the plaintext of CBC ciphertext accepted under the oracle's key, without recovering that key, using only observable padding validity. All cryptographic operations use the browser's native WebCrypto API: real AES-128-CBC encryption with PKCS#7 padding, real AES-256-GCM for the AEAD defense demo, and real padding validation on queries that reach CBC decryption; the Encrypt-then-MAC server rejects modified ciphertext before that check. The attack exploits CBC combined with observable padding behavior, not a weakness in AES itself.
 
 ## When to Use It
 
@@ -44,7 +44,7 @@ fail against.
 
 - **Distinguishable error responses** — any reliably different response after padding validation can supply the one-bit oracle; this is what broke ASP.NET (MS10-070 / CVE-2010-3332). A particular HTTP status-code pair is not required.
 - **Timing side-channels in padding validation** — even constant-time padding checks can leak information through MAC computation length differences, as demonstrated by Lucky Thirteen against TLS CBC cipher suites.
-- **Ignored padding bytes in SSL 3.0** — SSL 3.0 only validates the last padding byte, allowing POODLE to recover one plaintext byte per ~256 requests without a traditional padding oracle.
+- **Ignored padding bytes in SSL 3.0** — SSL 3.0 only validates the last padding byte, so whether the server accepts a modified record is itself a padding oracle — which is what POODLE (Padding Oracle On Downgraded Legacy Encryption) exploits to recover one plaintext byte per ~256 requests.
 - **Predictable IVs in TLS 1.0** — reusing the last ciphertext block as the next record's IV (BEAST) enables a related chosen-plaintext attack against CBC, even without a padding oracle.
 - **Processing unauthenticated CBC** — verify integrity over the IV, ciphertext, and relevant context before attempting padded CBC decryption. Prefer a reviewed AEAD construction such as AES-GCM or ChaCha20-Poly1305 for new designs.
 
